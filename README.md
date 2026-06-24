@@ -6,7 +6,7 @@
 
 </div>
 
-A Minecraft Forge 1.12.2 port and extension of [FatherToast's Utility Mobs](https://www.curseforge.com/minecraft/mc-mods/utility-mobs),
+A 1.12.2 port and extension of [FatherToast's Utility Mobs](https://www.curseforge.com/minecraft/mc-mods/utility-mobs),
 originally written for Minecraft 1.7.10. Everything from the original is present, Redux adds a detailed
 in-game guide book, a full config GUI, right-click healing, a batch-spawn command, and a pile of
 balance and performance adjustments.
@@ -29,7 +29,7 @@ balance and performance adjustments.
 
 - Minecraft 1.12.2
 - Minecraft Forge 14.23.5.2860 or newer
-- [Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli) (required - ships the in-game guide book)
+- [Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli)
 
 ## Installation
 

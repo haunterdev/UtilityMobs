@@ -7,10 +7,9 @@
 </div>
 
 A Minecraft Forge 1.12.2 port and extension of [FatherToast's Utility Mobs](https://www.curseforge.com/minecraft/mc-mods/utility-mobs),
-originally written for Minecraft 1.7.10. Every mob, turret, and colossal golem from the original is present and
-buildable, rebuilt on the 1.12.2 Forge entity/AI/rendering pipeline. On top of the faithful port, Redux adds an
-in-game Patchouli guide book, a full config GUI, right-click healing, a batch-spawn command, and a pile of
-balance and performance knobs.
+originally written for Minecraft 1.7.10. Everything from the original is present, Redux adds a detailed
+in-game guide book, a full config GUI, right-click healing, a batch-spawn command, and a pile of
+balance and performance adjustments.
 
 ## Features
 
@@ -21,10 +20,10 @@ balance and performance knobs.
 - **Turret upgrades.** Fire, explosive, fire-explosive, killer, feather, slow, sight, poison, and egg upgrades swap onto a turret and change how it shoots.
 - **Target Book.** A per-player targeting filter - toggle hostile / passive / neutral, and pick nearest, farthest, strongest, or weakest target modes. Multiplayer-safe, keyed to the owner.
 - **In-game guide book.** A Patchouli book with build guides (live multiblock projections), stat pages, and upgrade docs. Granted automatically on first join.
-- **Right-click healing.** Right-click a golem with its repair (drop) item to heal it - works on combat, block, and turret golems, with a floating heal number.
-- **`/umsummon` command.** Batch-spawn golems, turrets, or colossi for staged mob battles (`/umsummon <type> <count> [team|hostile]`, op level 2).
+- **Right-click healing.** Right-click a golem with its repair (drop) item to heal it - works on combat, block, and turret golems.
+- **`/umsummon` command.** Batch-spawn golems, turrets, or colossi for staged mob battles (`/umsummon <type> <count> [team|hostile]`).
 - **Config GUI.** Every behavior and balance value is editable live under Mods, Utility Mobs, Config - ammo requirements, drop chances, target scan tuning, collision caps, build toggles per mob, and more.
-- **Big-army performance.** Config-tunable target-scan caps, collision push-caps and density-disable, activation-range gating, and budgeted owner-teleports so a parked army costs almost nothing.
+- **Big-army performance.** Config-tunable target-scan caps, collision push-caps and density-disable, activation-range gating, and budgeted so a parked army costs almost nothing.
 
 ## Requirements
 
@@ -49,7 +48,7 @@ The built jar lands in `build/libs/`. A deobfuscated Patchouli jar is bundled in
 ## Credits
 
 - Original Utility Mobs mod by **FatherToast** ([CurseForge](https://www.curseforge.com/minecraft/mc-mods/utility-mobs)).
-- 1.12.2 Forge port and Redux additions by **hunterhaunter**.
+- 1.12.2 Forge port and Redux additions by **Xy**.
 
 ## License
 

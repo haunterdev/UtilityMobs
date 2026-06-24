@@ -1,4 +1,4 @@
-# Utility Mobs (1.12.2 port)
+# Utility Mobs: Redux
 
 A 1.12.2 port of **Utility Mobs** by FatherToast. Adds simple utility mobs in the
 spirit of the vanilla snow and iron golems: combat golems, block golems (chest,

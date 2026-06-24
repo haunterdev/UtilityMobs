@@ -1,0 +1,39 @@
+{
+  "name": "Fire Turret",
+  "category": "utilitymobs:turrets",
+  "icon": "minecraft:redstone_block",
+  "sortnum": 6,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "D"
+          ],
+          [
+            "F"
+          ],
+          [
+            "0"
+          ]
+        ],
+        "mapping": {
+          "D": "minecraft:dispenser",
+          "F": "minecraft:fence",
+          "0": "minecraft:redstone_block"
+        }
+      },
+      "text": "",
+      "offset_y": -7.0,
+      "scale": 0.8
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:fireturret",
+      "name": "Fire Turret",
+      "text": "Health: 20  Armor: 0$(br)Damage: 4  Range: 10$(br)Shots: 1  Atk speed: 3.3"
+    }
+  ]
+}

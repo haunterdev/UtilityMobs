@@ -1,0 +1,9 @@
+{
+  "name": "Fire",
+  "category": "utilitymobs:upgrades",
+  "icon": "minecraft:iron_ingot",
+  "sortnum": 2,
+  "pages": [
+    { "type": "spotlight", "item": "minecraft:iron_ingot", "title": "Fire", "text": "Shots set the target on fire. Trades a little impact damage for the burn." }
+  ]
+}

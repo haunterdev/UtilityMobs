@@ -1,0 +1,10 @@
+{
+  "name": "Building & Taming",
+  "category": "utilitymobs:getting_started",
+  "icon": "minecraft:pumpkin",
+  "sortnum": 1,
+  "pages": [
+    { "type": "text", "text": "Build a mob in the world by stacking the blocks shown in its entry. Most golems finish with a $(item)Pumpkin$() on top; block golems use a $(item)Skeleton Skull$(); turrets sit on a $(item)Fence$() over their base block.$(br2)Once the last block is placed, the structure springs to life, owned by you." },
+    { "type": "text", "text": "Combat golems hunt hostiles for you; aim them with the $(item)Target Book$() (see Tools). Block golems (chest, furnace, anvil, and the like) are pure utility: they store, carry, and work, with no attacks.$(br2)Sneak and right-click a $(o)block golem$() to make it sit and hold its spot." }
+  ]
+}

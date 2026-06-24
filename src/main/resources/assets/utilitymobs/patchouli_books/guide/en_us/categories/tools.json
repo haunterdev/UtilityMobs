@@ -1,0 +1,6 @@
+{
+  "name": "Tools",
+  "description": "Items that help you command your golems.",
+  "icon": "minecraft:writable_book",
+  "sortnum": 6
+}

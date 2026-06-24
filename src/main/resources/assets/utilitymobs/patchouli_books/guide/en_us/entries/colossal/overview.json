@@ -1,0 +1,10 @@
+{
+  "name": "Building a Colossus",
+  "category": "utilitymobs:colossal",
+  "icon": "minecraft:skull",
+  "sortnum": 0,
+  "pages": [
+    { "type": "text", "text": "A colossus is a giant golem built from a single block type. Assemble the large body, then place any mob head on the SIDE of the structure to bring it to life." },
+    { "type": "text", "text": "Only its owner can ride a colossus. You can't just right-click anywhere: $(o)jump and right-click the colossus's upper back$() to mount.$(br2)While mounted, $(o)left-click to swing its arms on command$(), or just steer it into enemies. Either way it soaks the damage that would otherwise hit you." }
+  ]
+}

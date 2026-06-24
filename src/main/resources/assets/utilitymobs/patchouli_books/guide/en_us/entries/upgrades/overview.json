@@ -1,0 +1,10 @@
+{
+  "name": "How Upgrades Work",
+  "category": "utilitymobs:upgrades",
+  "icon": "minecraft:book",
+  "sortnum": 0,
+  "pages": [
+    { "type": "text", "text": "Each turret holds one upgrade at a time, and the upgrade item is $(o)never consumed$().$(br2)Right-click a turret with an upgrade item to install it. Hold a different upgrade and right-click to swap them. Open the turret's menu to remove one." },
+    { "type": "text", "text": "Some turrets reject some upgrades.$(br2)Browse this category for what each upgrade does." }
+  ]
+}

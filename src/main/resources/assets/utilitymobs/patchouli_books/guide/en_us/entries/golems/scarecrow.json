@@ -1,0 +1,46 @@
+{
+  "name": "Scarecrow",
+  "category": "utilitymobs:golems",
+  "icon": "minecraft:hay_block",
+  "sortnum": 9,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            " P "
+          ],
+          [
+            "FWF"
+          ],
+          [
+            " 0 "
+          ]
+        ],
+        "mapping": {
+          "P": "minecraft:pumpkin[facing=north]",
+          "F": "minecraft:fence",
+          "W": "minecraft:wool",
+          "0": "minecraft:fence"
+        }
+      },
+      "text": ""
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:scarecrow",
+      "name": "Scarecrow",
+      "text": "Health: 20  Armor: 0$(br)Damage: equipped weapon (1 unarmed)  Speed: 2.5"
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Combat golem. Follows nearby players, roams when idle, and fights with its equipped weapon."
+    },
+    {
+      "type": "text",
+      "text": "$(l)Hidden powers:$()$(br)$(li)$(o)Right-click it with a weapon$() to arm it; right-click empty-handed to take it back.$(li)It deals $(o)only its weapon's damage$(), so hand it your best blade."
+    }
+  ]
+}

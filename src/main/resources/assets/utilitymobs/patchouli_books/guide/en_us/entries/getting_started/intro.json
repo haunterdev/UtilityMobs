@@ -1,0 +1,13 @@
+{
+  "name": "Welcome",
+  "category": "utilitymobs:getting_started",
+  "icon": "minecraft:pumpkin",
+  "sortnum": 0,
+  "pages": [
+    {
+      "type": "text",
+      "text": "Utility Mobs adds helpers you assemble from blocks: golems, turrets, and colossi.$(br2)Most golems are built like a vanilla iron golem: stack the blocks an entry shows, then top it with the final block to bring it to life. Turrets and colossi use their own patterns.$(br2)Browse the categories for every pattern and its stats."
+    },
+    { "type": "spotlight", "item": "minecraft:pumpkin", "title": "Bring It to Life", "text": "Place the final $(item)Pumpkin$() (or $(item)Skeleton Skull$() for block golems) and the build springs to life, owned by you." }
+  ]
+}

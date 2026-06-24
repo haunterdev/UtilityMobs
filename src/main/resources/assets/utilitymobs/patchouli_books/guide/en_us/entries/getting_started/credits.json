@@ -1,0 +1,13 @@
+{
+  "name": "Credits",
+  "category": "utilitymobs:getting_started",
+  "icon": "minecraft:cake",
+  "sortnum": 9,
+  "pages": [
+    {
+      "type": "text",
+      "text": "Utility Mobs was created by $(l:https://www.curseforge.com/members/fathertoast/projects)FatherToast$(), the original author of the mod and all of its golems, turrets, and colossi.$(br2)This is a 1.12.2 port with new content and features added on top. All credit for the $(o)original$() concept and content goes to FatherToast."
+    },
+    { "type": "spotlight", "item": "minecraft:cake", "title": "Thanks for Playing", "text": "That's the lot - go build an army. Enjoy your golems!" }
+  ]
+}

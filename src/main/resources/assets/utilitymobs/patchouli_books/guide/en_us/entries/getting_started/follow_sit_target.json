@@ -1,0 +1,10 @@
+{
+  "name": "Follow, Sit & Target",
+  "category": "utilitymobs:getting_started",
+  "icon": "minecraft:lead",
+  "sortnum": 2,
+  "pages": [
+    { "type": "text", "text": "Golems don't trail behind you. A golem guards the area where you built it, wandering nearby and striking back at anything that hurts it or its owner.$(br2)Only $(o)block golems$() (chest, furnace, anvil, etc.) can be told to $(o)sit$(): sneak and right-click one to make it hold its exact spot." },
+    { "type": "text", "text": "Combat golems can be aimed: the $(item)Target Book$() (see Tools) sets which mobs they hunt.$(br2)Turrets hold the spot where you build them and cover the area around them and don't wander, though a $(item)Feather$() upgrade lets you push one to a new spot. Block golems are utility only and don't fight." }
+  ]
+}

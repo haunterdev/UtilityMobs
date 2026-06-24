@@ -1,0 +1,9 @@
+{
+  "name": "Poison",
+  "category": "utilitymobs:upgrades",
+  "icon": "minecraft:spider_eye",
+  "sortnum": 8,
+  "pages": [
+    { "type": "spotlight", "item": "minecraft:spider_eye", "title": "Poison", "text": "Every hit poisons the target, wearing it down over time." }
+  ]
+}

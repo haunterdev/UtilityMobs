@@ -1,0 +1,40 @@
+{
+  "name": "Chest Golem",
+  "category": "utilitymobs:block_golems",
+  "icon": "minecraft:chest",
+  "sortnum": 4,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "S"
+          ],
+          [
+            "0"
+          ]
+        ],
+        "mapping": {
+          "S": "minecraft:skull",
+          "0": "minecraft:chest"
+        }
+      },
+      "text": "Top the block with a SKELETON skull (only skeleton skulls build block golems).",
+      "offset_y": -5.0,
+      "scale": 0.72
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:chestgolem",
+      "name": "Chest Golem",
+      "text": "Health: 10  Armor: 0$(br)Speed: 2.8",
+      "scale": 0.5
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Utility golem. Follows its owner, roams when idle, and can be told to sit (sneak + right-click). Right-click to use it."
+    }
+  ]
+}

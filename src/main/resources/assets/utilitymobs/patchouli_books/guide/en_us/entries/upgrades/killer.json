@@ -1,0 +1,9 @@
+{
+  "name": "Killer",
+  "category": "utilitymobs:upgrades",
+  "icon": "minecraft:diamond",
+  "sortnum": 1,
+  "pages": [
+    { "type": "spotlight", "item": "minecraft:diamond", "title": "Killer", "text": "Boosts arrow damage to roughly 1.5x plus one. The strongest damage upgrade." }
+  ]
+}

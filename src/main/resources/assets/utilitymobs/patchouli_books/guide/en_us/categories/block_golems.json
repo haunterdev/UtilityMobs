@@ -1,0 +1,6 @@
+{
+  "name": "Block Golems",
+  "description": "Golems that carry a container: chest, furnace, anvil, and more.",
+  "icon": "minecraft:chest",
+  "sortnum": 2
+}

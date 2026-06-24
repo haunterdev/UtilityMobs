@@ -1,0 +1,54 @@
+{
+  "name": "Armor Colossus",
+  "category": "utilitymobs:colossal",
+  "icon": "minecraft:iron_block",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "BBBBB",
+            "  0  "
+          ],
+          [
+            "BBBBB",
+            "     "
+          ],
+          [
+            " BBB ",
+            "     "
+          ],
+          [
+            " B B ",
+            "     "
+          ]
+        ],
+        "mapping": {
+          "B": "minecraft:iron_block",
+          "0": "minecraft:skull"
+        },
+        "offset": [
+          0,
+          -3,
+          0
+        ]
+      },
+      "text": "The hardest-hitting colossus. Build the iron-block body, then place $(o)any mob head$() on its front - the head shown here cycles through your options.",
+      "scale": 0.82,
+      "cycle_heads": true
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:armorcolossus",
+      "name": "Armor Colossus",
+      "text": "Health: 500  Armor: 0$(br)Damage: 18  Speed: 2"
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Massive combat golem. Roams when idle and crushes hostiles in melee."
+    }
+  ]
+}

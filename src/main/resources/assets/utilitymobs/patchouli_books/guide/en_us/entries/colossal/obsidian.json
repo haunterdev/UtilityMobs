@@ -1,0 +1,54 @@
+{
+  "name": "Obsidian Colossus",
+  "category": "utilitymobs:colossal",
+  "icon": "minecraft:obsidian",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "BBBBB",
+            "  0  "
+          ],
+          [
+            "BBBBB",
+            "     "
+          ],
+          [
+            " BBB ",
+            "     "
+          ],
+          [
+            " B B ",
+            "     "
+          ]
+        ],
+        "mapping": {
+          "B": "minecraft:obsidian",
+          "0": "minecraft:skull"
+        },
+        "offset": [
+          0,
+          -3,
+          0
+        ]
+      },
+      "text": "The toughest colossus. Build the obsidian body, then place $(o)any mob head$() on its front - the head shown here cycles through your options.",
+      "scale": 0.82,
+      "cycle_heads": true
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:obsidiancolossus",
+      "name": "Obsidian Colossus",
+      "text": "Health: 500  Armor: 20$(br)Damage: 10  Speed: 1.5"
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Massive combat golem. Roams when idle and crushes hostiles in melee."
+    }
+  ]
+}

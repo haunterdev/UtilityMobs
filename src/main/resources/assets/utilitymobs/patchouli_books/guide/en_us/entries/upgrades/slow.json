@@ -1,0 +1,9 @@
+{
+  "name": "Slow",
+  "category": "utilitymobs:upgrades",
+  "icon": "minecraft:slime_ball",
+  "sortnum": 4,
+  "pages": [
+    { "type": "spotlight", "item": "minecraft:slime_ball", "title": "Slow", "text": "Every hit slows the target, making it easy to keep enemies at range." }
+  ]
+}

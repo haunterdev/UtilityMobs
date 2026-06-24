@@ -1,0 +1,10 @@
+{
+  "name": "How Upgrades Work",
+  "category": "utilitymobs:getting_started",
+  "icon": "minecraft:diamond",
+  "sortnum": 5,
+  "pages": [
+    { "type": "text", "text": "Turret upgrades grant bonuses, and the upgrade item is $(o)never consumed$(). Right-click a turret with an upgrade item to install it, or hold a different upgrade and right-click to swap them. Open the turret's menu to remove one.$(br2)See $(lc:upgrades)Turret Upgrades$() for what each one does." },
+    { "type": "spotlight", "item": "minecraft:feather", "title": "Installed, Not Spent", "text": "Example: the $(item)Feather$() upgrade un-anchors a turret so you can push it to a new spot - handy for repositioning without breaking it." }
+  ]
+}

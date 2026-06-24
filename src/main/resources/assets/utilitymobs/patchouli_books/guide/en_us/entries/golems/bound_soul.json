@@ -1,0 +1,47 @@
+{
+  "name": "Bound Soul",
+  "category": "utilitymobs:golems",
+  "icon": "minecraft:soul_sand",
+  "sortnum": 10,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "P"
+          ],
+          [
+            "S"
+          ],
+          [
+            "0"
+          ]
+        ],
+        "mapping": {
+          "P": "minecraft:pumpkin[facing=north]",
+          "S": "minecraft:soul_sand",
+          "0": "minecraft:soul_sand"
+        }
+      },
+      "text": "",
+      "offset_y": -7.0,
+      "scale": 0.8
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:boundsoul",
+      "name": "Bound Soul",
+      "text": "Health: 20  Armor: equipped armor$(br)Damage: equipped weapon (1 unarmed)  Speed: 3"
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Combat golem. Follows nearby players, roams when idle, and fights with its equipped weapon."
+    },
+    {
+      "type": "text",
+      "text": "$(l)Hidden powers:$()$(br)$(li)$(o)Right-click it with a weapon or armor$() to equip it; right-click empty-handed to take the gear back.$(li)$(o)Right-click it with food$() to heal it.$(li)It deals $(o)only its weapon's damage$(); a sharp blade matters more than its own strength."
+    }
+  ]
+}

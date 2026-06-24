@@ -1,0 +1,115 @@
+
+entity.UMFishHook.name=Fish Hook
+
+entity.GenericGolem.name=Golem
+
+entity.AnvilGolem.name=Anvil Golem
+entity.ChestEnderGolem.name=Ender Chest Golem
+entity.ChestGolem.name=Chest Golem
+entity.ChestTrappedGolem.name=Trapped Chest Golem
+entity.FurnaceGolem.name=Furnace Golem
+entity.JukeboxGolem.name=Jukebox Golem
+entity.LanternGolem.name=Jack o'Lantern Golem
+entity.WorkbenchGolem.name=Crafting Table Golem
+
+entity.ArmorGolem.name=Armor Golem
+entity.BoundSoul.name=Bound Soul
+entity.GildedGolem.name=Gilded Golem
+entity.MelonGolem.name=Melon Golem
+entity.ObsidianGolem.name=Obsidian Golem
+entity.Scarecrow.name=Scarecrow
+entity.SteamGolem.name=Steam Golem
+entity.StoneGolem.name=Stone Golem
+entity.StoneLargeGolem.name=Large Stone Golem
+entity.UMIronGolem.name=Iron Golem
+entity.UMSnowGolem.name=Snow Golem
+
+entity.BrickTurret.name=Stone Brick Turret
+entity.FireballTurret.name=Fireball Turret
+entity.FireTurret.name=Fire Turret
+entity.GatlingTurret.name=Gatling Turret
+entity.GhastTurret.name=Ghast Turret
+entity.KillerTurret.name=Killer Turret
+entity.ObsidianTurret.name=Obsidian Turret
+entity.ShotgunTurret.name=Shotgun Turret
+entity.SniperTurret.name=Sniper Turret
+entity.SnowTurret.name=Snow Turret
+entity.StoneTurret.name=Stone Turret
+entity.VolleyTurret.name=Volley Turret
+
+entity.ArmorColossus.name=Armor Colossus
+entity.ObsidianColossus.name=Obsidian Colossus
+entity.StoneColossus.name=Stone Colossus
+
+itemGroup.utilitymobs=Utility Mobs
+
+utilitymobs.gui.range_on=Range: ON
+utilitymobs.gui.range_off=Range: OFF
+utilitymobs.gui.hostile_on=Hostiles: ON
+utilitymobs.gui.hostile_off=Hostiles: OFF
+utilitymobs.gui.passive_on=Passives: ON
+utilitymobs.gui.passive_off=Passives: OFF
+utilitymobs.stat.health=Health
+utilitymobs.stat.armor=Armor
+utilitymobs.stat.damage=Damage
+utilitymobs.stat.firerate=Fire rate
+utilitymobs.stat.range=Range
+utilitymobs.stat.accuracy=Accuracy
+utilitymobs.effect.ignite=Ignite (5s)
+utilitymobs.effect.explode=Explode
+utilitymobs.effect.explode_fire=Fiery explode
+utilitymobs.effect.poison=Poison (3s)
+utilitymobs.effect.slow=Slow (3s)
+utilitymobs.effect.egg=Egg-kills weak
+utilitymobs.effect.mobile=Mobile
+utilitymobs.effect.knockback=Knockback
+utilitymobs.effect.aoe=Hits all nearby
+utilitymobs.gui.target_close=Target: Close
+utilitymobs.gui.target_far=Target: Far
+utilitymobs.gui.target_strong=Target: Strong
+utilitymobs.gui.target_weak=Target: Weak
+utilitymobs.gui.ammo=Ammo
+
+# Config GUI
+utilitymobs.cfg.cat.general=General
+utilitymobs.cfg.cat.turrets=Turrets
+utilitymobs.cfg.cat.golems=Worker Golems
+utilitymobs.cfg.cat.colossals=Colossal Golems
+utilitymobs.cfg.cat.build=Buildable Mobs
+utilitymobs.cfg.cat.build.golems=Worker Golems
+utilitymobs.cfg.cat.build.turrets=Turrets
+utilitymobs.cfg.cat.build.blocks=Block Golems
+utilitymobs.cfg.cat.build.hostiles=Hostile Golems
+utilitymobs.cfg.cat.build.colossals=Colossal Golems
+utilitymobs.cfg.master_toggle=Master Toggle
+utilitymobs.cfg.general.give_book_on_first_join=Give Book On First Join
+utilitymobs.cfg.general.alternate_manuals=Alternate Manual Recipes
+utilitymobs.cfg.general.creeper_head_rarity=Creeper Head Drop Rarity
+utilitymobs.cfg.general.hostile=All Mobs Hostile To Players
+utilitymobs.cfg.general.wither_conversion=Wither Skull to Skeleton Skull Recipe
+utilitymobs.cfg.general.skull_rarity=Skeleton Skull Drop Rarity
+utilitymobs.cfg.turrets.require_ammo=Require Ammo
+utilitymobs.cfg.turrets.friendly_passthrough=Friendly Projectile Passthrough
+utilitymobs.cfg.turrets.no_mob_aggro=Mobs Ignore Turrets
+utilitymobs.cfg.turrets.drop_chance=Block Drop Chance
+utilitymobs.cfg.turrets.collision=Solid (Walkable) Turrets
+utilitymobs.cfg.golems.attack_hostiles=Target Hostile Mobs
+utilitymobs.cfg.golems.attack_passives=Target Passive Mobs
+utilitymobs.cfg.golems.performance_logging=Performance Logging
+utilitymobs.cfg.golems.target_scan_interval=Target Scan Interval (ticks)
+utilitymobs.cfg.golems.target_raytrace_cap=Line-of-Sight Raytrace Cap
+utilitymobs.cfg.golems.collision_push_cap=Collision Push Cap
+utilitymobs.cfg.golems.collision_disable_density=Collision Disable Density
+utilitymobs.cfg.golems.collision_interval=Collision Check Interval
+utilitymobs.cfg.golems.active_range=Active Range (blocks)
+utilitymobs.cfg.golems.follow_teleports_per_tick=Follow Teleports Per Tick
+utilitymobs.cfg.golems.wander_budget=Wander Budget Per Tick
+utilitymobs.cfg.colossals.attack_hostiles=Target Hostile Mobs
+utilitymobs.cfg.colossals.attack_passives=Target Passive Mobs
+utilitymobs.cfg.colossals.wander_while_ridden=Wander While Ridden
+utilitymobs.cfg.golems.attack_neutrals=Target Neutral Mobs
+utilitymobs.cfg.colossals.attack_neutrals=Target Neutral Mobs
+utilitymobs.gui.neutral_on=Neutrals: ON
+utilitymobs.gui.neutral_off=Neutrals: OFF
+utilitymobs.cfg.build.golems.UMIronGolem=Vanilla Iron Golem Upgrade
+utilitymobs.cfg.build.golems.UMSnowGolem=Vanilla Snow Golem Upgrade

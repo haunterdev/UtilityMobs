@@ -1,0 +1,44 @@
+{
+  "name": "Armor Golem",
+  "category": "utilitymobs:golems",
+  "icon": "minecraft:iron_block",
+  "sortnum": 6,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "P"
+          ],
+          [
+            "I"
+          ],
+          [
+            "0"
+          ]
+        ],
+        "mapping": {
+          "P": "minecraft:pumpkin[facing=north]",
+          "I": "minecraft:iron_block",
+          "0": "minecraft:iron_block"
+        }
+      },
+      "text": "",
+      "offset_y": -7.0,
+      "scale": 0.8
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:armorgolem",
+      "name": "Armor Golem",
+      "offset": 0.12,
+      "text": "Health: 40  Armor: 15$(br)Damage: 7  Speed: 2.8"
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Combat golem. Roams when idle and attacks hostiles in range."
+    }
+  ]
+}

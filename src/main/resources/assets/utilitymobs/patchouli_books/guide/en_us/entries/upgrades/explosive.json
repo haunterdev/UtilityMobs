@@ -1,0 +1,9 @@
+{
+  "name": "Explosive",
+  "category": "utilitymobs:upgrades",
+  "icon": "minecraft:gunpowder",
+  "sortnum": 7,
+  "pages": [
+    { "type": "spotlight", "item": "minecraft:gunpowder", "title": "Explosive", "text": "Shots burst on impact for area damage. Trades a little impact damage for the blast." }
+  ]
+}

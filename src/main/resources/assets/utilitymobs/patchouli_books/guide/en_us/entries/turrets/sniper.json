@@ -1,0 +1,39 @@
+{
+  "name": "Sniper Turret",
+  "category": "utilitymobs:turrets",
+  "icon": "minecraft:lapis_block",
+  "sortnum": 7,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "D"
+          ],
+          [
+            "F"
+          ],
+          [
+            "0"
+          ]
+        ],
+        "mapping": {
+          "D": "minecraft:dispenser",
+          "F": "minecraft:fence",
+          "0": "minecraft:lapis_block"
+        }
+      },
+      "text": "",
+      "offset_y": -7.0,
+      "scale": 0.8
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:sniperturret",
+      "name": "Sniper Turret",
+      "text": "Health: 20  Armor: 0$(br)Damage: 6  Range: 20$(br)Shots: 1  Atk speed: 2.9"
+    }
+  ]
+}

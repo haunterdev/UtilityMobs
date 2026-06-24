@@ -1,0 +1,46 @@
+plugins {
+    id 'com.gtnewhorizons.retrofuturagradle' version '1.4.1'
+}
+
+version = project.mod_version
+group = project.mod_group
+archivesBaseName = project.mod_id
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(8))
+    }
+}
+
+minecraft {
+    mcVersion = '1.12.2'
+    mcpMappingChannel = 'stable'
+    mcpMappingVersion = '39'
+
+    extraRunJvmArguments.addAll(
+        '-ea:toast.utilityMobs'
+    )
+}
+
+dependencies {
+    // Patchouli guide-book library (1.0-23.6). Compile-only: the runtime copy is
+    // provided by the instance's mods folder. rfg.deobf remaps the published jar to
+    // MCP dev names so the API (vazkii.patchouli.api.*) resolves in dev.
+    implementation rfg.deobf(files('libs/Patchouli-1.0-23.6.jar'))
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'mcversion', '1.12.2'
+
+    filesMatching('mcmod.info') {
+        expand 'version': project.version, 'mcversion': '1.12.2'
+    }
+}
+
+// emit dev compile classpath for parallel typecheck
+tasks.register('printCp') { doLast { println sourceSets.main.compileClasspath.asPath } }
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

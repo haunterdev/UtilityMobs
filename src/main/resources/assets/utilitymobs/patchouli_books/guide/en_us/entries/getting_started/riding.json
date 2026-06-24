@@ -1,0 +1,20 @@
+{
+  "name": "Riding",
+  "category": "utilitymobs:getting_started",
+  "icon": "minecraft:saddle",
+  "sortnum": 3,
+  "pages": [
+    { "type": "text", "text": "Only its owner can ride a colossus. You can't just right-click anywhere: $(o)jump and right-click the colossus's upper back$() to climb aboard.$(br2)While mounted, $(o)left-click to make it attack$() on command, or steer it into enemies. It soaks the damage that would otherwise hit you." },
+    {
+      "type": "utilitymobs:entity_carousel",
+      "name": "The Colossi",
+      "entities": [
+        "utilitymobs:stonecolossus",
+        "utilitymobs:obsidiancolossus",
+        "utilitymobs:armorcolossus"
+      ],
+      "interval": 70,
+      "text": ""
+    }
+  ]
+}

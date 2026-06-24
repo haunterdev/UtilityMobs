@@ -1,0 +1,10 @@
+{
+  "name": "Target Book",
+  "category": "utilitymobs:tools",
+  "icon": "minecraft:writable_book",
+  "sortnum": 0,
+  "pages": [
+    { "type": "text", "text": "The $(item)Target Book$() tells your golems what to hunt. Hold it and right-click a mob to add that mob type to the target list, and your golems will then seek it out." },
+    { "type": "text", "text": "Sneak and right-click a mob to remove it from the list instead. There are two books (crafted with a $(item)Bone$() or $(item)Rotten Flesh$()) for separate target lists." }
+  ]
+}

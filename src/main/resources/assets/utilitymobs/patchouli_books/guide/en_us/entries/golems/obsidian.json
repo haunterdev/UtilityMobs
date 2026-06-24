@@ -1,0 +1,45 @@
+{
+  "name": "Obsidian Golem",
+  "category": "utilitymobs:golems",
+  "icon": "minecraft:obsidian",
+  "sortnum": 5,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            " P "
+          ],
+          [
+            "OOO"
+          ],
+          [
+            " 0 "
+          ]
+        ],
+        "mapping": {
+          "P": "minecraft:pumpkin[facing=north]",
+          "O": "minecraft:obsidian",
+          "0": "minecraft:obsidian"
+        }
+      },
+      "text": ""
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:obsidiangolem",
+      "name": "Obsidian Golem",
+      "text": "Health: 100  Armor: 20$(br)Damage: 2  Speed: 2.5"
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Tanky combat golem. Roams when idle and attacks hostiles in range."
+    },
+    {
+      "type": "text",
+      "text": "$(l)Hidden power:$() $(o)Completely fire- and lava-proof$() - it fights happily in the Nether or a burning room, where most golems would burn."
+    }
+  ]
+}

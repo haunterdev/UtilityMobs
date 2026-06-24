@@ -1,0 +1,9 @@
+{
+  "name": "Sight",
+  "category": "utilitymobs:upgrades",
+  "icon": "minecraft:ender_pearl",
+  "sortnum": 6,
+  "pages": [
+    { "type": "spotlight", "item": "minecraft:ender_pearl", "title": "Sight", "text": "Doubles the turret's targeting range so it fires on threats much sooner. A 10-block turret reaches 20, a 20-block turret reaches 40." }
+  ]
+}

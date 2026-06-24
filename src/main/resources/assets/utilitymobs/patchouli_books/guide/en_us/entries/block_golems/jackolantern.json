@@ -1,0 +1,44 @@
+{
+  "name": "Jack o'Lantern Golem",
+  "category": "utilitymobs:block_golems",
+  "icon": "minecraft:lit_pumpkin",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "S"
+          ],
+          [
+            "0"
+          ]
+        ],
+        "mapping": {
+          "S": "minecraft:skull",
+          "0": "minecraft:lit_pumpkin"
+        }
+      },
+      "text": "Top the block with a SKELETON skull (only skeleton skulls build block golems).",
+      "offset_y": -5.0,
+      "scale": 0.72
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:lanterngolem",
+      "name": "Jack o'Lantern Golem",
+      "text": "Health: 10  Armor: 0$(br)Speed: 2.8",
+      "scale": 0.5
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Utility golem. Follows its owner, roams when idle, and can be told to sit (sneak + right-click)."
+    },
+    {
+      "type": "text",
+      "text": "$(l)Hidden powers:$()$(br)$(li)It $(o)glows like a torch as it walks$(), lighting everything around it.$(li)Fill its $(o)9-slot inventory$() with torches or glowstone and it will $(o)place them in dark spots$() as it passes, permanently lighting the area behind it: a walking spawn-proofer."
+    }
+  ]
+}

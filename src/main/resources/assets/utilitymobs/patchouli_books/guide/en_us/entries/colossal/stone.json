@@ -1,0 +1,54 @@
+{
+  "name": "Stone Colossus",
+  "category": "utilitymobs:colossal",
+  "icon": "minecraft:cobblestone",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "BBBBB",
+            "  0  "
+          ],
+          [
+            "BBBBB",
+            "     "
+          ],
+          [
+            " BBB ",
+            "     "
+          ],
+          [
+            " B B ",
+            "     "
+          ]
+        ],
+        "mapping": {
+          "B": "minecraft:cobblestone",
+          "0": "minecraft:skull"
+        },
+        "offset": [
+          0,
+          -3,
+          0
+        ]
+      },
+      "text": "The cheapest colossus. Build the cobblestone body, then place $(o)any mob head$() on its front - the head shown here cycles through your options.",
+      "scale": 0.82,
+      "cycle_heads": true
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:stonecolossus",
+      "name": "Stone Colossus",
+      "text": "Health: 100  Armor: 2$(br)Damage: 10  Speed: 1.5"
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Massive combat golem. Stands guard and does not wander. Crushes hostiles in melee."
+    }
+  ]
+}

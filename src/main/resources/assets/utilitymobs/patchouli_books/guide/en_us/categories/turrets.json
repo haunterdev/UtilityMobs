@@ -1,0 +1,6 @@
+{
+  "name": "Turrets",
+  "description": "Stationary turrets that fire on hostiles.",
+  "icon": "minecraft:dispenser",
+  "sortnum": 3
+}

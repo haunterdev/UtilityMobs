@@ -1,0 +1,39 @@
+{
+  "name": "Stone Brick Turret",
+  "category": "utilitymobs:turrets",
+  "icon": "minecraft:stonebrick",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "D"
+          ],
+          [
+            "F"
+          ],
+          [
+            "0"
+          ]
+        ],
+        "mapping": {
+          "D": "minecraft:dispenser",
+          "F": "minecraft:fence",
+          "0": "minecraft:stonebrick"
+        }
+      },
+      "text": "",
+      "offset_y": -7.0,
+      "scale": 0.8
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:brickturret",
+      "name": "Stone Brick Turret",
+      "text": "Health: 20  Armor: 0$(br)Damage: 2  Range: 10$(br)Shots: 1  Atk speed: 5.7"
+    }
+  ]
+}

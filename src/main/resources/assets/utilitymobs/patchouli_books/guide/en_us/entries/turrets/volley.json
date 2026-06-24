@@ -1,0 +1,39 @@
+{
+  "name": "Volley Turret",
+  "category": "utilitymobs:turrets",
+  "icon": "minecraft:emerald_block",
+  "sortnum": 10,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "D"
+          ],
+          [
+            "F"
+          ],
+          [
+            "0"
+          ]
+        ],
+        "mapping": {
+          "D": "minecraft:dispenser",
+          "F": "minecraft:fence",
+          "0": "minecraft:emerald_block"
+        }
+      },
+      "text": "",
+      "offset_y": -7.0,
+      "scale": 0.8
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:volleyturret",
+      "name": "Volley Turret",
+      "text": "Health: 20  Armor: 6$(br)Damage: 3 x 6  Range: 20$(br)Shots: 6  Atk speed: 2.5"
+    }
+  ]
+}

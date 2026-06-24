@@ -1,0 +1,9 @@
+{
+  "name": "Fire Explosive",
+  "category": "utilitymobs:upgrades",
+  "icon": "minecraft:fire_charge",
+  "sortnum": 9,
+  "pages": [
+    { "type": "spotlight", "item": "minecraft:fire_charge", "title": "Fire Explosive", "text": "Shots explode in flames, combining burn and blast. Trades the most impact damage." }
+  ]
+}

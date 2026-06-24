@@ -1,0 +1,22 @@
+{
+    "__comment": "3D stone golem head for the creative-tab icon. Full-block cube textured from a SQUARE copy of the entity skin (64x64; non-square skins are rejected by the block atlas). UVs are head-box pixels / 4.",
+    "parent": "block/block",
+    "textures": {
+        "particle": "utilitymobs:items/stonegolem_head",
+        "skin": "utilitymobs:items/stonegolem_head"
+    },
+    "elements": [
+        {
+            "from": [ 0, 0, 0 ],
+            "to": [ 16, 16, 16 ],
+            "faces": {
+                "north": { "uv": [ 2, 2, 4, 4 ], "texture": "#skin" },
+                "south": { "uv": [ 6, 2, 8, 4 ], "texture": "#skin" },
+                "east":  { "uv": [ 0, 2, 2, 4 ], "texture": "#skin" },
+                "west":  { "uv": [ 4, 2, 6, 4 ], "texture": "#skin" },
+                "up":    { "uv": [ 2, 0, 4, 2 ], "texture": "#skin" },
+                "down":  { "uv": [ 4, 0, 6, 2 ], "texture": "#skin" }
+            }
+        }
+    ]
+}

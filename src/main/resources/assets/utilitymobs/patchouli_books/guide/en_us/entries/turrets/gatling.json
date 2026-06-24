@@ -1,0 +1,39 @@
+{
+  "name": "Gatling Turret",
+  "category": "utilitymobs:turrets",
+  "icon": "minecraft:gold_block",
+  "sortnum": 9,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            "D"
+          ],
+          [
+            "F"
+          ],
+          [
+            "0"
+          ]
+        ],
+        "mapping": {
+          "D": "minecraft:dispenser",
+          "F": "minecraft:fence",
+          "0": "minecraft:gold_block"
+        }
+      },
+      "text": "",
+      "offset_y": -7.0,
+      "scale": 0.8
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:gatlingturret",
+      "name": "Gatling Turret",
+      "text": "Health: 20  Armor: 6$(br)Damage: 1  Range: 10$(br)Shots: 1  Atk speed: 13.3"
+    }
+  ]
+}

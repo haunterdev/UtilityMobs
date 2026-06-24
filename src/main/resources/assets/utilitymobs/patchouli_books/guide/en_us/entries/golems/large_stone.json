@@ -1,0 +1,41 @@
+{
+  "name": "Large Stone Golem",
+  "category": "utilitymobs:golems",
+  "icon": "minecraft:cobblestone",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            " P "
+          ],
+          [
+            "CCC"
+          ],
+          [
+            " 0 "
+          ]
+        ],
+        "mapping": {
+          "P": "minecraft:pumpkin[facing=north]",
+          "C": "minecraft:cobblestone",
+          "0": "minecraft:cobblestone"
+        }
+      },
+      "text": ""
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:stonelargegolem",
+      "name": "Large Stone Golem",
+      "text": "Health: 16  Armor: 2$(br)Damage: 3  Speed: 2"
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Combat guard. Stands its ground and does not wander. Attacks hostile mobs within range. Like all large golems, each heavy hit knocks its target into the air."
+    }
+  ]
+}

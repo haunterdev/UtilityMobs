@@ -1,0 +1,9 @@
+{
+  "name": "Feather",
+  "category": "utilitymobs:upgrades",
+  "icon": "minecraft:feather",
+  "sortnum": 3,
+  "pages": [
+    { "type": "spotlight", "item": "minecraft:feather", "title": "Feather", "text": "The turret is no longer anchored. It can be pushed and shoved around freely." }
+  ]
+}

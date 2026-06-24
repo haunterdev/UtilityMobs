@@ -1,0 +1,9 @@
+{
+  "name": "Egg",
+  "category": "utilitymobs:upgrades",
+  "icon": "minecraft:egg",
+  "sortnum": 5,
+  "pages": [
+    { "type": "spotlight", "item": "minecraft:egg", "title": "Egg", "text": "A killing blow on a weak mob can turn it into a chicken instead." }
+  ]
+}

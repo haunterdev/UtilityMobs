@@ -1,0 +1,46 @@
+{
+  "name": "Steam Golem",
+  "category": "utilitymobs:golems",
+  "icon": "minecraft:furnace",
+  "sortnum": 4,
+  "pages": [
+    {
+      "type": "utilitymobs:build_guide",
+      "name": "Build Guide",
+      "multiblock": {
+        "pattern": [
+          [
+            " P "
+          ],
+          [
+            "CFC"
+          ],
+          [
+            " 0 "
+          ]
+        ],
+        "mapping": {
+          "P": "minecraft:pumpkin[facing=north]",
+          "C": "minecraft:cobblestone",
+          "F": "minecraft:furnace[facing=north]",
+          "0": "minecraft:cobblestone"
+        }
+      },
+      "text": ""
+    },
+    {
+      "type": "entity",
+      "entity": "utilitymobs:steamgolem",
+      "name": "Steam Golem",
+      "text": "Health: 40  Armor: 2$(br)Damage: 7  Speed: 2.5"
+    },
+    {
+      "type": "text",
+      "text": "$(l)Behavior:$() Combat golem. Roams when idle and attacks hostiles in range. It sits idle automatically while out of fuel and gets back up the moment it has fuel again."
+    },
+    {
+      "type": "text",
+      "text": "$(l)Fuel:$() The steam golem burns fuel to run. Open it (right-click) and stock its slots with $(item)Coal$() or any furnace fuel; it only fights and moves while burning and sits dormant once it runs dry.$(br2)A $(item)Hopper$() placed above it feeds fuel in automatically, so a chest of coal keeps it stoked."
+    }
+  ]
+}

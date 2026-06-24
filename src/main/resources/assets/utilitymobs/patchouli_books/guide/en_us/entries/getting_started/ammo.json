@@ -1,0 +1,10 @@
+{
+  "name": "Turret Ammo",
+  "category": "utilitymobs:getting_started",
+  "icon": "minecraft:arrow",
+  "sortnum": 4,
+  "pages": [
+    { "type": "text", "text": "Turrets fire on their own. By default they need no ammo.$(br2)If a modpack enables the $(o)require ammo$() option, open a turret's GUI and stock its ammo slots. Stocked turrets only fire while they have ammo, and fired arrows can be picked back up.$(br2)The facing page lists which ammo each turret takes." },
+    { "type": "spotlight", "item": "minecraft:arrow", "title": "Turret Ammo", "text": "Arrow turrets fire $(item)Arrows$(). Fireball and ghast turrets use $(item)Fire Charges$(); snow turrets use $(item)Snowballs$()." }
+  ]
+}

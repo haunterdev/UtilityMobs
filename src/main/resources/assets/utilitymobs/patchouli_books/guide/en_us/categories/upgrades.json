@@ -1,0 +1,6 @@
+{
+  "name": "Turret Upgrades",
+  "description": "Items that grant turrets new powers.",
+  "icon": "minecraft:diamond",
+  "sortnum": 5
+}

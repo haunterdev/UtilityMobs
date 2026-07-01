@@ -1,5 +1,6 @@
 package toast.utilityMobs.golem;
 
+import net.minecraft.block.SoundType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.IEntityLivingData;
 import net.minecraft.entity.ai.EntityAILookIdle;
@@ -23,6 +24,12 @@ public class EntityGildedGolem extends EntityUtilityGolem
 {
     /// The texture for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "golem/gildedgolem.png");
+
+    @Override
+    protected SoundType getGolemSoundType() {
+        return SoundType.METAL;
+    }
+
 
     public EntityGildedGolem(World world) {
         super(world);

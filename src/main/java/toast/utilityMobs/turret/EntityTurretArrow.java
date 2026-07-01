@@ -5,6 +5,13 @@ import net.minecraft.entity.projectile.EntityTippedArrow;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.world.World;
 
+/**
+    A tipped-arrow fired by a turret. Identical to {@link EntityTippedArrow} in every way except that
+    it puffs into a small cloud of particles when it is removed, instead of popping out of existence.
+    Covers the two cases where turret arrows otherwise vanish without feedback: timing out after
+    sticking in the ground (the 1200-tick in-ground despawn), and the server destroying the entity
+    once it leaves the tracker. The poof is client-only and fires exactly once (guarded by isDead).
+ */
 public class EntityTurretArrow extends EntityTippedArrow
 {
     public EntityTurretArrow(World world) {

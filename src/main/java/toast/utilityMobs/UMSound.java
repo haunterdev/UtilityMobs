@@ -7,6 +7,12 @@ import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.world.World;
 
+/**
+    Central mapping for the legacy (1.7.10) string sound/particle names this mod used.
+    In 1.7.10 sounds and particles were referenced by raw String; 1.12.2 uses
+    {@link SoundEvent} constants and {@link EnumParticleTypes}. Mapped here once so the
+    entity classes stay readable and consistent.
+ */
 public final class UMSound {
     private UMSound() {}
 
@@ -33,6 +39,7 @@ public final class UMSound {
     public static final EnumParticleTypes SMOKE = EnumParticleTypes.SMOKE_NORMAL;        // "smoke"
     public static final EnumParticleTypes WATER_SPLASH = EnumParticleTypes.WATER_SPLASH; // "splash"
 
+    /** Legacy {@code World.playSoundAtEntity} replacement (1.12.2 needs a SoundCategory). */
     public static void playAt(Entity entity, SoundEvent sound, float volume, float pitch) {
         World world = entity.world;
         world.playSound(null, entity.posX, entity.posY, entity.posZ, sound, SoundCategory.NEUTRAL, volume, pitch);

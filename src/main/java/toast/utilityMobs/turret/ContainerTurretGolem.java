@@ -12,6 +12,7 @@ import toast.utilityMobs.EnumUpgrade;
 public class ContainerTurretGolem extends Container {
     private final EntityTurretGolem turret;
 
+    /** Live view over the turret's equipment slot 0 (the upgrade). */
     private static class UpgradeInventory extends InventoryBasic {
         private final EntityTurretGolem turret;
         UpgradeInventory(EntityTurretGolem turret) {

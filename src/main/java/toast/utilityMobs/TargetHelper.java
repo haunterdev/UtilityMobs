@@ -56,6 +56,11 @@ public class TargetHelper
     private HashMap<String, Byte> permissions = new HashMap<String, Byte>();
     // Mob class blacklist for this target helper.
     private HashSet<Class> mobBlacklist = new HashSet<Class>();
+
+    // Global, config-driven attack blacklist (general.attack_blacklist). Entity classes here are NEVER
+    // targeted by any golem/turret, regardless of owner target books or the attack_* toggles. Shared by
+    // all target helpers; rebuilt from config on every Properties.load() (init + in-game config save).
+    private static final HashSet<Class> GLOBAL_BLACKLIST = new HashSet<Class>();
     // Mob class whitelist for this target helper.
     private ArrayList<Class> mobWhitelist = new ArrayList<Class>();
     // Memoizes isWhitelisted() results per concrete entity Class. isWhitelisted loops the whitelist
@@ -64,6 +69,8 @@ public class TargetHelper
     // first sight. Cleared whenever the whitelist changes (whitelist/unwhitelist/load).
     private final HashMap<Class, Boolean> whitelistCache = new HashMap<Class, Boolean>();
 
+    /** Fixed set of vanilla "neutral" mobs (don't attack unprovoked). Used by the hostile/
+        neutral/passive target gate so players can choose to leave these alone. */
     public static boolean isNeutralMob(Entity entity) {
         return entity instanceof net.minecraft.entity.monster.EntityEnderman
             || entity instanceof net.minecraft.entity.monster.EntityPigZombie
@@ -185,6 +192,8 @@ public class TargetHelper
     // Returns true if the given entity should be attacked.
     public boolean isValidTarget(Entity entity) {
         if (!this.maintainTarget(entity))
+            return false;
+        if (TargetHelper.isGloballyBlacklisted(entity.getClass()))
             return false;
         if (this.owner == null)
             return entity instanceof EntityUtilityGolem ? ((IEntityOwnable)entity).getOwner() != null : true;
@@ -885,6 +894,39 @@ public class TargetHelper
             }
         }
         return name;
+    }
+
+    // Rebuilds the global attack blacklist from the config's general.attack_blacklist list. Each entry is
+    // an entity registry id (e.g. minecraft:cow), the tokens "Player"/"Hostiles", or a fully-qualified
+    // class name. Unresolvable entries are skipped (a modded id may not resolve until that mod has loaded;
+    // the list is rebuilt on the next reload). Called from Properties.load().
+    public static void loadGlobalBlacklist(String[] names) {
+        TargetHelper.GLOBAL_BLACKLIST.clear();
+        if (names == null)
+            return;
+        for (String name : names) {
+            if (name == null || name.trim().isEmpty())
+                continue;
+            Class entry = TargetHelper.stringToClass(name.trim());
+            if (entry != null) {
+                TargetHelper.GLOBAL_BLACKLIST.add(entry);
+            }
+            else {
+                _UtilityMobs.console("attack_blacklist: could not resolve entity '" + name.trim() + "' (skipped).");
+            }
+        }
+    }
+
+    // True if the entity class is covered by the global attack blacklist (matches the class or any
+    // superclass/interface entry, so blacklisting a base type also covers its subclasses).
+    public static boolean isGloballyBlacklisted(Class entityClass) {
+        if (TargetHelper.GLOBAL_BLACKLIST.isEmpty())
+            return false;
+        for (Class blocked : TargetHelper.GLOBAL_BLACKLIST) {
+            if (blocked.isAssignableFrom(entityClass))
+                return true;
+        }
+        return false;
     }
 
     // Attempts to load a class from the given string.

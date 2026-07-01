@@ -14,6 +14,14 @@ import vazkii.patchouli.client.book.page.PageEntity;
 import vazkii.patchouli.client.book.page.abstr.PageWithText;
 import vazkii.patchouli.common.util.EntityUtil;
 
+/**
+    Custom Patchouli page type ("utilitymobs:entity_carousel"). Like the stock "entity" page but
+    cycles through several entities, showing one at a time and slowly swapping between them while
+    each spins. Reuses Patchouli's public PageEntity.renderEntity() for the actual draw.
+
+    JSON: "entities" (string array of entity ids), optional "name" (title; defaults to the current
+    entity's name), "scale" (default 1.0), "offset" (default 0), "interval" (ticks per entity, 60).
+ */
 public class PageEntityCarousel extends PageWithText {
 
     @SerializedName("entities")

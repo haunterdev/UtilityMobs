@@ -18,6 +18,9 @@ public class HealTextRenderer {
     private static final List<HealText> TEXTS = new ArrayList<HealText>();
 
     public static void add(Entity entity, float amount) {
+        if (!toast.utilityMobs.Properties.getBoolean(toast.utilityMobs.Properties.GENERAL, "heal_numbers")) {
+            return;
+        }
         TEXTS.add(new HealText(entity, amount));
     }
 

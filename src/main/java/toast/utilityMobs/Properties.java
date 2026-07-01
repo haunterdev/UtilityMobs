@@ -7,6 +7,15 @@ import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 import net.minecraftforge.fml.client.config.GuiConfigEntries;
 
+/**
+    This helper class automatically creates, stores, and retrieves properties.
+    Supported data types:
+        String, boolean, int, double
+
+    Any property can be retrieved as an Object or String.
+    Any non-String property can also be retrieved as any other non-String property.
+    Retrieving a number as a boolean will produce a randomized output depending on the value.
+ */
 public abstract class Properties
 {
     // Mapping of all properties in the mod to their values.
@@ -34,6 +43,10 @@ public abstract class Properties
         prop.setLanguageKey("utilitymobs.cfg.general.give_book_on_first_join");
         prop = Properties.add(config, Properties.GENERAL, "alternate_manuals", false, "If this is true, manual recipes will require a book and quill instead of just a book.");
         prop.setLanguageKey("utilitymobs.cfg.general.alternate_manuals");
+        prop = Properties.add(config, Properties.GENERAL, "heal_numbers", true, "If true, a floating green +N appears over a golem when it is healed (melon golem, food, repair item). Set false to hide the numbers - useful with damage-indicator mods.");
+        prop.setLanguageKey("utilitymobs.cfg.general.heal_numbers");
+        prop = Properties.add(config, Properties.GENERAL, "show_help_button", true, "If true, golem GUIs (steam golem, block-golem inventories) show a '?' button that opens the guide book. Set false to hide it. Has no effect when Patchouli is not installed (the button is hidden either way).");
+        prop.setLanguageKey("utilitymobs.cfg.general.show_help_button");
         prop = Properties.add(config, Properties.GENERAL, "creeper_head_rarity", 80, "The rarity for a creeper to drop its head when killed. Setting this to 0 disables skull drops. Drop chance is 1/(rarity - looting).");
         prop.setLanguageKey("utilitymobs.cfg.general.creeper_head_rarity").setMinValue(0);
         prop = Properties.add(config, Properties.GENERAL, "hostile", false, "If this is true, all utility mobs added by this mod will be hostile towards players.");
@@ -42,6 +55,12 @@ public abstract class Properties
         prop.setLanguageKey("utilitymobs.cfg.general.wither_conversion");
         prop = Properties.add(config, Properties.GENERAL, "skull_rarity", 60, "The rarity for a skeleton to drop its skull when killed. Setting this to 0 disables skull drops. Drop chance is 1/(rarity - looting).");
         prop.setLanguageKey("utilitymobs.cfg.general.skull_rarity").setMinValue(0);
+        // Global attack blacklist: entity types golems/turrets will NEVER attack. Native Forge string-list
+        // (one entry per line) so it renders as an editable list in the GUI. Resolved by TargetHelper.
+        Property attackBlacklist = config.get(Properties.GENERAL, "attack_blacklist", new String[0],
+            "Entity types that golems and turrets will NEVER attack, regardless of owner target books or the attack_* toggles. One entry per line: an entity registry id (e.g. minecraft:cow, minecraft:villager), the tokens Player or Hostiles, or a fully-qualified class name. Blacklisting a base class also covers its subclasses. Lets you protect animals/NPCs the in-game target book cannot add.");
+        attackBlacklist.setLanguageKey("utilitymobs.cfg.general.attack_blacklist");
+        TargetHelper.loadGlobalBlacklist(attackBlacklist.getStringList());
 
         // ---- Turrets (behavior) ----
         prop = Properties.add(config, "turrets", "require_ammo", false, "If true, turrets must hold matching ammo in their 9-slot ammo inventory to fire (arrow turrets need arrows, fireball/ghast need fire charges, snow needs snowballs). Adds an ammo panel to the turret GUI.");
@@ -56,6 +75,8 @@ public abstract class Properties
         prop.setLanguageKey("utilitymobs.cfg.turrets.collision");
 
         // ---- Worker Golems (behavior) ----
+        prop = Properties.add(config, "golems", "block_collision", false, "If true, block golems (chest/furnace/crafting table/anvil/jukebox) become solid and can be stood on and walked across - line them up to build a walkway. Off by default; block golems are pass-through.");
+        prop.setLanguageKey("utilitymobs.cfg.golems.block_collision");
         prop = Properties.add(config, "golems", "attack_hostiles", true, "If true, worker golems and colossal golems may target hostile mobs.");
         prop.setLanguageKey("utilitymobs.cfg.golems.attack_hostiles");
         prop = Properties.add(config, "golems", "attack_passives", false, "If true, worker golems and colossal golems may target passive mobs.");
@@ -139,6 +160,7 @@ public abstract class Properties
         // Cache the perf tunables into static fields so the per-tick/per-golem hot paths avoid a map lookup.
         UMProfiler.enabled = Properties.getBoolean("golems", "performance_logging");
         toast.utilityMobs.turret.EntityTurretGolem.collision = Properties.getBoolean("turrets", "collision");
+        toast.utilityMobs.block.EntityBlockGolem.collision = Properties.getBoolean("golems", "block_collision");
         toast.utilityMobs.ai.EntityAIGolemTarget.scanInterval = Math.max(1, Properties.getInt("golems", "target_scan_interval"));
         toast.utilityMobs.ai.EntityAIGolemTarget.raytraceCap = Math.max(1, Properties.getInt("golems", "target_raytrace_cap"));
         toast.utilityMobs.golem.EntityUtilityGolem.collisionPushCap = Properties.getInt("golems", "collision_push_cap");

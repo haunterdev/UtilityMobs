@@ -252,26 +252,22 @@ public class EntitySteamGolem extends EntityLargeGolem implements IInventory
             this.burnTime--;
         }
         if (!this.world.isRemote) {
-            // Load fuel from other inventory slots.
-            if (this.getStackInSlot(1).isEmpty() || TileEntityFurnace.getItemBurnTime(this.getStackInSlot(1)) <= 0) {
-                ItemStack current = this.getStackInSlot(1);
-                for (int slot = 0; slot < this.contents.size(); slot++) {
-                    if (slot != 1 && !this.getStackInSlot(slot).isEmpty() && TileEntityFurnace.getItemBurnTime(this.getStackInSlot(slot)) > 0) {
-                        this.setInventorySlotContents(1, this.getStackInSlot(slot));
-                        this.setInventorySlotContents(slot, current);
-                        break;
-                    }
-                }
-            }
-            // Burn fuel.
+            // Burn fuel from whichever slot holds it. We consume in place rather than shuffling fuel
+            // into a fixed "burn" slot every tick - that old per-tick swap both made placed fuel jump
+            // to the middle slot and mutated the open inventory mid-interaction, which desynced the GUI
+            // and could visually dupe the stack. Now fuel stays exactly where the player put it.
             if (this.burnTime == 0) {
-                this.maxBurnTime = this.burnTime = TileEntityFurnace.getItemBurnTime(this.getStackInSlot(1));
-                if (this.burnTime > 0 && !this.getStackInSlot(1).isEmpty()) {
-                    ItemStack fuel = this.getStackInSlot(1);
-                    ItemStack container = fuel.getItem().getContainerItem(fuel);
-                    fuel.shrink(1);
-                    if (fuel.isEmpty()) {
-                        this.setInventorySlotContents(1, container);
+                for (int slot = 0; slot < this.contents.size(); slot++) {
+                    ItemStack fuel = this.getStackInSlot(slot);
+                    int burn = TileEntityFurnace.getItemBurnTime(fuel);
+                    if (!fuel.isEmpty() && burn > 0) {
+                        this.maxBurnTime = this.burnTime = burn;
+                        ItemStack container = fuel.getItem().getContainerItem(fuel);
+                        fuel.shrink(1);
+                        if (fuel.isEmpty()) {
+                            this.setInventorySlotContents(slot, container);
+                        }
+                        break;
                     }
                 }
             }

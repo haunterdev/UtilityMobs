@@ -42,12 +42,21 @@ public class ContainerFurnaceGolem extends Container
         this.golem.closeInventory(player);
     }
 
+    // The client opens the VANILLA GuiFurnace (the GUI was opened with the "minecraft:furnace" window id),
+    // so the window-property ids MUST match what GuiFurnace reads from a vanilla furnace's fields:
+    //   0 = burn time (flame), 1 = current item burn time (flame total),
+    //   2 = cook time (arrow),  3 = total cook time (arrow total, always 200).
+    // The old code sent cook/burn/itemBurn as ids 0/1/2 and never sent id 3, so the arrow divided by a
+    // zero total-cook-time and never moved.
+    private static final int TOTAL_COOK_TIME = 200;
+
     @Override
     public void addListener(IContainerListener listener) {
         super.addListener(listener);
-        listener.sendWindowProperty(this, 0, this.golem.cookTime);
-        listener.sendWindowProperty(this, 1, this.golem.burnTime);
-        listener.sendWindowProperty(this, 2, this.golem.itemBurnTime);
+        listener.sendWindowProperty(this, 0, this.golem.burnTime);
+        listener.sendWindowProperty(this, 1, this.golem.itemBurnTime);
+        listener.sendWindowProperty(this, 2, this.golem.cookTime);
+        listener.sendWindowProperty(this, 3, TOTAL_COOK_TIME);
     }
 
     @Override
@@ -55,14 +64,14 @@ public class ContainerFurnaceGolem extends Container
         super.detectAndSendChanges();
         for (int i = 0; i < this.listeners.size(); i++) {
             IContainerListener listener = this.listeners.get(i);
-            if (this.lastCookTime != this.golem.cookTime) {
-                listener.sendWindowProperty(this, 0, this.golem.cookTime);
-            }
             if (this.lastBurnTime != this.golem.burnTime) {
-                listener.sendWindowProperty(this, 1, this.golem.burnTime);
+                listener.sendWindowProperty(this, 0, this.golem.burnTime);
             }
             if (this.lastItemBurnTime != this.golem.itemBurnTime) {
-                listener.sendWindowProperty(this, 2, this.golem.itemBurnTime);
+                listener.sendWindowProperty(this, 1, this.golem.itemBurnTime);
+            }
+            if (this.lastCookTime != this.golem.cookTime) {
+                listener.sendWindowProperty(this, 2, this.golem.cookTime);
             }
         }
         this.lastCookTime = this.golem.cookTime;
@@ -74,13 +83,13 @@ public class ContainerFurnaceGolem extends Container
     @Override
     public void updateProgressBar(int id, int value) {
         if (id == 0) {
-            this.golem.cookTime = value;
-        }
-        if (id == 1) {
             this.golem.burnTime = value;
         }
-        if (id == 2) {
+        if (id == 1) {
             this.golem.itemBurnTime = value;
+        }
+        if (id == 2) {
+            this.golem.cookTime = value;
         }
     }
 

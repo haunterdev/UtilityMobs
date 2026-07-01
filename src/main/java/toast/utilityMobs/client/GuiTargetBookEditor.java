@@ -28,6 +28,18 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 import org.lwjgl.input.Keyboard;
 
+/**
+    A deliberately small book editor for the Utility Mobs target-list books. Vanilla's GuiScreenBook
+    only appends/backspaces at the end of a page with no cursor, so you cannot edit an earlier line
+    without deleting everything after it. This screen adds a movable text cursor - Left/Right/Up/Down,
+    Home/End, plus insert/delete at the cursor - so individual lines can be edited in place. It keeps
+    everything else minimal: pages are split on '\n' and drawn line-by-line (the list entries are short
+    ids that never need word-wrap), and the edited book is pushed to the server when the screen closes
+    (ESC or Done), which our save-on-exit tick then parses.
+
+    Installed by swapping out vanilla's GuiScreenBook via {@link OpenHandler} whenever the player opens
+    a writable target book (one carrying the "umt" tag). Registered in ClientProxy.
+ */
 public class GuiTargetBookEditor extends GuiScreen {
 
     private static final ResourceLocation BOOK_TEXTURES = new ResourceLocation("textures/gui/book.png");
@@ -354,6 +366,7 @@ public class GuiTargetBookEditor extends GuiScreen {
         }
     }
 
+    /** Book-style page-turn arrow, drawn from the book texture (matches vanilla's look). */
     static class PageButton extends GuiButton {
         private final boolean forward;
 
@@ -375,6 +388,7 @@ public class GuiTargetBookEditor extends GuiScreen {
         }
     }
 
+    /** Swaps vanilla's book editor for this cursor-capable one when a writable target book is opened. */
     public static class OpenHandler {
         @SubscribeEvent
         public void onGuiOpen(GuiOpenEvent event) {

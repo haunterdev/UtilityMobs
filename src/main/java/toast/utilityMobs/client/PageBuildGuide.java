@@ -45,6 +45,17 @@ import vazkii.patchouli.common.multiblock.Multiblock;
 import vazkii.patchouli.common.multiblock.MultiblockRegistry;
 import vazkii.patchouli.common.multiblock.SerializedMultiblock;
 
+/**
+    Custom Patchouli page type ("utilitymobs:build_guide"). A near-verbatim copy of Patchouli's
+    PageMultiblock, but with three JSON-controllable display knobs the built-in page lacks:
+
+      "offset_x" / "offset_y"  screen-pixel nudge of the rendered structure (default 0)
+      "scale"                  multiplier on the auto-fit scale (default 1.0; <1 adds frame margin)
+
+    Defaults reproduce vanilla Patchouli rendering exactly, so untuned pages look identical to the
+    stock "multiblock" type. Lives in our own package (all Patchouli members it touches are public),
+    so no patchouli-package source injection is needed. Registered in ClientProxy.
+ */
 public class PageBuildGuide extends PageWithText {
 
     String name;

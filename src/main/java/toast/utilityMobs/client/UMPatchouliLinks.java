@@ -15,6 +15,16 @@ import vazkii.patchouli.client.book.text.Span;
 import vazkii.patchouli.client.book.text.SpanState;
 import vazkii.patchouli.common.book.Book;
 
+/**
+    Adds a Patchouli book-text function Patchouli itself lacks: {@code $(lc:category)} - a link that
+    opens a whole CATEGORY page (the entry grid), not a single entry. The built-in {@code $(l:...)}
+    can only target entries, so "see the upgrades directory" links had nowhere correct to point.
+
+    Registered once at client init by reflecting Patchouli's private {@code BookTextParser.FUNCTIONS}
+    map (a plain HashMap populated in that class's static initializer; touching the field here forces
+    that init first, so our entry is appended on top). All members it then uses - GuiBookCategory's
+    constructor, Book.contents, BookContents.openLexiconGui, SpanState's fields - are public.
+ */
 @SideOnly(Side.CLIENT)
 public final class UMPatchouliLinks {
 

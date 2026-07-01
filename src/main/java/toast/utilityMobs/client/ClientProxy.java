@@ -79,6 +79,8 @@ public class ClientProxy extends CommonProxy
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(new HealTextRenderer());
         // Draws the turret GUI's "?" help tooltip after JEI's overlay so it isn't hidden behind JEI items.
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(new GuiTurretGolem.HelpTooltipHandler());
+        // First-launch setup wizard: swaps the main menu for the experience picker until dismissed.
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(new SetupWizardHandler());
         RenderingRegistry.registerEntityRenderingHandler(EntityGolemFishHook.class, RenderGolemFishHook::new);
 
         RenderingRegistry.registerEntityRenderingHandler(EntityUtilityGolem.class, RenderGolem::new);

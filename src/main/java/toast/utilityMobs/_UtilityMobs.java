@@ -48,7 +48,7 @@ public class _UtilityMobs
     // This mod's id (lowercased for 1.12.2 - registry/resource domains must be lowercase).
     public static final String MODID = "utilitymobs";
     // This mod's version.
-    public static final String VERSION = "3.1.1";
+    public static final String VERSION = "3.2.0";
 
     // If true, this mod starts up in debug mode.
     public static final boolean debug = false;
@@ -179,7 +179,8 @@ public class _UtilityMobs
             icon.setTranslationKey(_UtilityMobs.MODID + ".stonegolem_face");
             _UtilityMobs.TAB_ICON = icon;
             event.getRegistry().register(icon);
-            // Client-side: register its model now that the item exists.
+
+            // Client-side: register the models now that the items exist.
             _UtilityMobs.proxy.registerTabIconModel();
         }
 
@@ -262,6 +263,7 @@ public class _UtilityMobs
     @Mod.EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
         event.registerServerCommand(new CommandUMSummon());
+        event.registerServerCommand(new CommandUMBlacklist());
     }
 
     // Inserts a space before every capital letter (except the first).

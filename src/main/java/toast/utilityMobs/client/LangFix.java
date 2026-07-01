@@ -17,10 +17,17 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import toast.utilityMobs._UtilityMobs;
 
+/**
+    The mod's en_us.lang is present in the jar but Minecraft's resource pack layer does not serve it
+    for this mod (textures from the same domain load fine, the lang file throws FileNotFound). To make
+    entity/egg/creative-tab names show, load the lang straight off the classpath and inject it into the
+    active Locale, re-applying on every resource reload (vanilla rebuilds the Locale on reload).
+ */
 @SideOnly(Side.CLIENT)
 public class LangFix implements IResourceManagerReloadListener
 {
-    private static final String LANG_PATH = "/assets/utilitymobs/lang/en_us.lang";
+    private static final String LANG_DIR = "/assets/utilitymobs/lang/";
+    private static final String FALLBACK_LANG = "en_us";
 
     public static void install() {
         IResourceManager rm = Minecraft.getMinecraft().getResourceManager();
@@ -38,7 +45,16 @@ public class LangFix implements IResourceManagerReloadListener
     @SuppressWarnings("unchecked")
     private static void inject() {
         try {
-            Map<String, String> entries = readLangFromClasspath();
+            // Build the key set to inject: the active language first, then en_us to backfill any keys the
+            // active language hasn't translated. putMissing means resource-pack-supplied keys (already in
+            // the target Locale when this runs on reload) still win over both, and the active language wins
+            // over the English fallback. Dropping an <code>.lang into the jar is all a new locale needs.
+            Map<String, String> entries = new java.util.HashMap<String, String>();
+            String active = activeLanguageCode();
+            if (active != null && !active.equals(FALLBACK_LANG)) {
+                entries.putAll(readLangFromClasspath(LANG_DIR + active + ".lang"));
+            }
+            putMissing(entries, readLangFromClasspath(LANG_DIR + FALLBACK_LANG + ".lang"));
             if (entries.isEmpty())
                 return;
 
@@ -46,7 +62,7 @@ public class LangFix implements IResourceManagerReloadListener
             Locale locale = (Locale) field(I18n.class, "i18nLocale", "field_135054_a").get(null);
             if (locale != null) {
                 Map<String, String> props = (Map<String, String>) field(Locale.class, "properties", "field_135032_a").get(locale);
-                props.putAll(entries);
+                putMissing(props, entries);
             }
 
             // 2) Common LanguageMap (net.minecraft.util.text.translation.I18n) - spawn-egg names,
@@ -55,7 +71,7 @@ public class LangFix implements IResourceManagerReloadListener
             Object langMap = field(langMapCls, "instance", "field_74817_a").get(null);
             if (langMap != null) {
                 Map<String, String> list = (Map<String, String>) field(langMapCls, "languageList", "field_74816_c").get(langMap);
-                list.putAll(entries);
+                putMissing(list, entries);
             }
 
             _UtilityMobs.console("LangFix injected ", Integer.toString(entries.size()), " translations.");
@@ -66,11 +82,36 @@ public class LangFix implements IResourceManagerReloadListener
         }
     }
 
-    private static Map<String, String> readLangFromClasspath() throws Exception {
+    // Fills only keys the target map does not already have, so resource packs / localization mods that
+    // provide their own utilitymobs.* strings win. Our reload listener runs after vanilla rebuilds the
+    // Locale, so any pack-supplied keys are already present here and are left untouched.
+    private static void putMissing(Map<String, String> target, Map<String, String> entries) {
+        for (Map.Entry<String, String> e : entries.entrySet()) {
+            if (!target.containsKey(e.getKey())) {
+                target.put(e.getKey(), e.getValue());
+            }
+        }
+    }
+
+    /// The active language code (e.g. "ru_ru"), lowercased to match the jar's lang file names, or null.
+    private static String activeLanguageCode() {
+        try {
+            return Minecraft.getMinecraft().getLanguageManager().getCurrentLanguage().getLanguageCode()
+                    .toLowerCase(java.util.Locale.ROOT);
+        }
+        catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private static Map<String, String> readLangFromClasspath(String path) throws Exception {
         Map<String, String> entries = new java.util.HashMap<String, String>();
-        try (InputStream in = LangFix.class.getResourceAsStream(LANG_PATH)) {
+        try (InputStream in = LangFix.class.getResourceAsStream(path)) {
             if (in == null) {
-                _UtilityMobs.console("[WARNING] LangFix: ", LANG_PATH, " not on classpath");
+                // Missing locale file is normal (most languages aren't shipped) - only warn for the fallback.
+                if (path.endsWith(FALLBACK_LANG + ".lang")) {
+                    _UtilityMobs.console("[WARNING] LangFix: ", path, " not on classpath");
+                }
                 return entries;
             }
             BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));

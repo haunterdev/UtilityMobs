@@ -20,6 +20,13 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import toast.utilityMobs.golem.EntityUtilityGolem;
 
+/**
+ * /umsummon &lt;type&gt; [count] [team]
+ *
+ * Batch-spawns Utility Mobs golems/turrets/colossi at the sender - handy for mob battles without the
+ * spawn-egg mass-spawn pitfall. With no team arg the golems are owned by the sender (friendly to them);
+ * with a team arg they join battle team "team_&lt;name&gt;" and fight golems on other teams.
+ */
 public class CommandUMSummon extends CommandBase {
     private static final int MAX_COUNT = 500;
     private static final List<String> TYPES = buildTypeList();

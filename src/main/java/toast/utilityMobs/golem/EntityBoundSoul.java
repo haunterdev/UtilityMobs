@@ -1,5 +1,6 @@
 package toast.utilityMobs.golem;
 
+import net.minecraft.block.SoundType;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.EntityAILookIdle;
 import net.minecraft.entity.ai.EntityAIWander;
@@ -39,6 +40,11 @@ public class EntityBoundSoul extends EntityUtilityGolem
     protected void applyEntityAttributes() {
         super.applyEntityAttributes();
         this.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).setBaseValue(0.3);
+    }
+
+    @Override
+    protected SoundType getGolemSoundType() {
+        return SoundType.SAND;
     }
 
     @Override

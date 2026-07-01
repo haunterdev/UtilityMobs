@@ -4,6 +4,14 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.renderer.GlStateManager;
 
+/**
+    A vanilla {@link GuiButton} shorter than 20px tall samples only the top {@code height} pixels of
+    the 20px-tall widget graphic, which clips off the button's bottom border row - every short button
+    looks cut off at the bottom. This variant draws the body minus a 3px bottom strip, then re-draws
+    that strip from the texture's own bottom 3 pixels, so the frame closes cleanly at any height.
+
+    Shared by the turret, steam golem, and generic inventory GUIs for their short help / toggle buttons.
+*/
 public class GuiBorderedButton extends GuiButton {
     private static final int BORDER = 3;
 

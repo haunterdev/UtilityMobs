@@ -18,8 +18,10 @@ import net.minecraft.tileentity.TileEntitySkull;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraft.item.ItemStack;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.oredict.OreDictionary;
 import toast.utilityMobs.block.EntityAnvilGolem;
 import toast.utilityMobs.block.EntityChestEnderGolem;
 import toast.utilityMobs.block.EntityChestGolem;
@@ -65,6 +67,28 @@ public class BuildHelper
     /// A set of usernames for players right-clicking a Block.
     public final HashSet<String> clickingBlock = new HashSet<String>();
 
+    /// Lazily-built set of every block registered under the "fenceWood" ore dictionary.
+    private static HashSet<Block> fenceWoodBlocks;
+
+    /// True if the block is any wooden fence (oak, spruce, birch, ... and modded ones via the
+    /// "fenceWood" ore dictionary). Used so golem builds accept any wood fence, not just oak.
+    public static boolean isFenceWood(Block block) {
+        if (block == null)
+            return false;
+        if (BuildHelper.fenceWoodBlocks == null) {
+            HashSet<Block> set = new HashSet<Block>();
+            for (ItemStack stack : OreDictionary.getOres("fenceWood")) {
+                Block b = Block.getBlockFromItem(stack.getItem());
+                if (b != Blocks.AIR) {
+                    set.add(b);
+                }
+            }
+            set.add(Blocks.OAK_FENCE); // safety net in case the ore dict entry is ever missing
+            BuildHelper.fenceWoodBlocks = set;
+        }
+        return BuildHelper.fenceWoodBlocks.contains(block);
+    }
+
     public BuildHelper() {
         MinecraftForge.EVENT_BUS.register(this);
     }
@@ -74,6 +98,9 @@ public class BuildHelper
         return world.getBlockState(new BlockPos(x, y, z)).getBlock();
     }
 
+    /**
+     * Called when the player right-clicks a block; queues a golem build server-side.
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         EntityPlayer player = event.getEntityPlayer();
@@ -90,6 +117,9 @@ public class BuildHelper
         }
     }
 
+    /**
+     * Called when the player right-clicks with an item in the air; handles target-book sync.
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         EntityPlayer player = event.getEntityPlayer();
@@ -101,6 +131,9 @@ public class BuildHelper
         }
     }
 
+    /**
+     * Called when the player right-clicks an entity; lets the target book interact with it.
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.getTarget() instanceof EntityLivingBase && BookHelper.interact(event.getEntityPlayer(), (EntityLivingBase)event.getTarget())) {
@@ -206,9 +239,9 @@ public class BuildHelper
             BuildHelper.particleEffect(world, "snowballpoof", x, y, z);
             return true;
         }
-        else if (Properties.getBoolean("build.golems", "Scarecrow") && top == Blocks.WOOL && bottom == Blocks.OAK_FENCE) {
-            boolean xAxis = armLX == Blocks.OAK_FENCE && armRX == Blocks.OAK_FENCE;
-            boolean zAxis = armLZ == Blocks.OAK_FENCE && armRZ == Blocks.OAK_FENCE;
+        else if (Properties.getBoolean("build.golems", "Scarecrow") && top == Blocks.WOOL && BuildHelper.isFenceWood(bottom)) {
+            boolean xAxis = BuildHelper.isFenceWood(armLX) && BuildHelper.isFenceWood(armRX);
+            boolean zAxis = BuildHelper.isFenceWood(armLZ) && BuildHelper.isFenceWood(armRZ);
             if (xAxis || zAxis) {
                 golem = new EntityScarecrow(world);
                 golem.setOwner(owner);

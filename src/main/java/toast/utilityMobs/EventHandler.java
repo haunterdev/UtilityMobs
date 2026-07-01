@@ -39,6 +39,9 @@ public class EventHandler
         MinecraftForge.EVENT_BUS.register(this);
     }
 
+    /**
+     * Fired when the in-game config GUI saves changes. Re-reads our config values so they apply without a restart.
+     */
     @SubscribeEvent
     public void onConfigChanged(ConfigChangedEvent.OnConfigChangedEvent event) {
         if (!_UtilityMobs.MODID.equals(event.getModID())) {
@@ -50,6 +53,12 @@ public class EventHandler
         Properties.reload();
     }
 
+    /**
+     * Gives ownership of an unowned utility golem to the nearest player when it enters the world - so a
+     * golem spawned from a creative spawn egg becomes YOURS (commandable, friendly) instead of ownerless.
+     * Golems built in-world (BuildHelper) already call setOwner() before spawning, so they are skipped;
+     * saved golems restore their owner from NBT before this fires, so reloads are not reassigned.
+     */
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public void onEntityJoinWorld(EntityJoinWorldEvent event) {
         Entity entity = event.getEntity();
@@ -65,6 +74,12 @@ public class EventHandler
         }
     }
 
+    /**
+     * Right-click a utility golem with a dye to assign it to a colored battle TEAM (owner = "team_<color>").
+     * Same color = allies; different colors fight each other (see EntityUtilityGolem.canAttack). Creative
+     * players may team any golem; survival players only ones they can interact with. Cancels the vanilla
+     * interaction so the dye isn't wasted on nothing.
+     */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onDyeGolemTeam(PlayerInteractEvent.EntityInteract event) {
         if (event.getHand() != EnumHand.MAIN_HAND || !(event.getTarget() instanceof EntityUtilityGolem))
@@ -87,6 +102,9 @@ public class EventHandler
         event.setCanceled(true);
     }
 
+    /**
+     * Called by EntityLiving.onDeath() - adds skeleton/creeper skull drops.
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onLivingDrops(LivingDropsEvent event) {
         // In 1.12.2 wither skeletons are a separate class, so EntitySkeleton is only the normal skeleton.
@@ -113,6 +131,9 @@ public class EventHandler
         }
     }
 
+    /**
+     * Called by EntityLivingBase.attackEntityFrom() - applies projectile upgrade effects.
+     */
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public void onLivingAttack(LivingAttackEvent event) {
         if (event.getSource() != null) {
@@ -158,6 +179,10 @@ public class EventHandler
         }
     }
 
+    /**
+     * While a player rides a colossus, suppress the player's own (puny, and i-frame-stealing) melee swing so
+     * the colossus's heavy punch is what actually lands. The colossus attack is driven by the attack-key packet.
+     */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onPlayerAttackWhileRiding(AttackEntityEvent event) {
         EntityPlayer player = event.getEntityPlayer();
@@ -166,6 +191,10 @@ public class EventHandler
         }
     }
 
+    /**
+     * While a player rides a colossus, the colossus soaks all incoming damage instead of the rider - unless the
+     * source is the colossus itself. The redirected hit cannot recurse because the colossus is not a player rider.
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onRiderHurt(LivingAttackEvent event) {
         if (!(event.getEntityLiving() instanceof EntityPlayer))
@@ -180,6 +209,10 @@ public class EventHandler
         mount.attackEntityFrom(source, event.getAmount());
     }
 
+    /**
+     * Called when any living entity acquires an attack target. When the no_mob_aggro option is on,
+     * clears the target (and revenge target) if it is a turret, so mobs never retaliate against turrets.
+     */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onSetAttackTarget(LivingSetAttackTargetEvent event) {
         if (!Properties.getBoolean("turrets", "no_mob_aggro"))
@@ -194,6 +227,16 @@ public class EventHandler
         }
     }
 
+    /**
+     * Called just before a projectile resolves an impact. When friendly_passthrough is on, cancels the
+     * impact (so the projectile keeps flying) when it hit a FRIENDLY utility golem - i.e. one fired by a
+     * turret/golem in the same army, so rows/layers of turrets shoot through each other instead of
+     * plinking off the turret in front (which our friendly-fire damage cancel turns into a visible bounce).
+     *
+     * Two independent friendliness signals are checked, because the projectile's owner NBT tag is not
+     * always present (e.g. an un-owned turret fires un-tagged arrows): the projectile's SHOOTER (the
+     * firing golem, always set at construction) and the owner tag. Either one matching passes the shot.
+     */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onProjectileImpact(ProjectileImpactEvent event) {
         if (!Properties.getBoolean("turrets", "friendly_passthrough"))
@@ -223,6 +266,9 @@ public class EventHandler
         }
     }
 
+    /** Best-effort lookup of the entity that fired a projectile (arrow/fireball), via the obfuscation-safe
+        SRG field name so it resolves in both the dev and the shipped (obfuscated) runtime. Returns null if
+        the projectile type isn't handled or the field can't be read. */
     private static Entity projectileShooter(Entity projectile) {
         try {
             if (projectile instanceof EntityArrow) {

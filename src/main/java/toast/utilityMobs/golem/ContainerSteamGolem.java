@@ -21,7 +21,14 @@ public class ContainerSteamGolem extends Container
         this.golem.openInventory(inventory.player);
         int i;
         for (i = 0; i < 3; i++) {
-            this.addSlotToContainer(new Slot(steamGolem, i, 62 + i * 18, 44));
+            // Fuel-only slots: reject anything that isn't furnace fuel on manual placement (mergeItemStack
+            // / hoppers already respect this via isItemValid). Keeps non-fuel out of the golem entirely.
+            this.addSlotToContainer(new Slot(steamGolem, i, 62 + i * 18, 44) {
+                @Override
+                public boolean isItemValid(ItemStack stack) {
+                    return TileEntityFurnace.isItemFuel(stack);
+                }
+            });
         }
         for (i = 0; i < 3; ++i) {
             for (int j = 0; j < 9; ++j) {
@@ -47,6 +54,9 @@ public class ContainerSteamGolem extends Container
         listener.sendWindowProperty(this, 2, this.golem.maxBurnTime);
     }
 
+    /**
+     * Looks for changes made in the container, sends them to every listener.
+     */
     @Override
     public void detectAndSendChanges() {
         super.detectAndSendChanges();

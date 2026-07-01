@@ -26,8 +26,10 @@ public class GuiSteamGolem extends GuiContainer {
     @Override
     public void initGui() {
         super.initGui();
-        // Help button (top-right) - opens the Patchouli guide book.
-        this.buttonList.add(new GuiBorderedButton(90, this.guiLeft + this.xSize - 20, this.guiTop + 4, 16, 16, "?"));
+        // Help button (top-right) - opens the Patchouli guide book. Hidden when general.show_help_button is false.
+        if (toast.utilityMobs.Properties.getBoolean(toast.utilityMobs.Properties.GENERAL, "show_help_button")) {
+            this.buttonList.add(new GuiBorderedButton(90, this.guiLeft + this.xSize - 20, this.guiTop + 4, 16, 16, "?"));
+        }
     }
 
     @Override

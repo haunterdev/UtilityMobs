@@ -8,6 +8,7 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 import toast.utilityMobs.turret.EntityTurretGolem;
 
+/** Client -> server: which=0 toggle attack-hostile, which=1 toggle attack-passive, which=2 cycle targeting mode, which=3 toggle attack-neutral. */
 public class MessageTurretToggle implements IMessage {
 
     public int entityId;

@@ -11,8 +11,10 @@ import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.init.SoundEvents;
 import net.minecraft.util.DamageSource;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.DifficultyInstance;
@@ -73,7 +75,11 @@ public class EntityUMSnowGolem extends EntityStackGolem
             this.attackEntityFrom(DamageSource.ON_FIRE, 1.0F);
         }
 
-        for (int l = 0; l < 4; l++) {
+        // Server-side only, and only when mobGriefing is on. Running this client-side painted ghost snow
+        // layers the server never placed (which lingered until a block update), so it looked like the
+        // golem ignored the gamerule. Vanilla snowman places snow server-side under the same rule.
+        boolean mobGriefing = !this.world.isRemote && this.world.getGameRules().getBoolean("mobGriefing");
+        for (int l = 0; mobGriefing && l < 4; l++) {
             blockX = MathHelper.floor(this.posX + (l % 2 * 2 - 1) * 0.25F);
             blockY = MathHelper.floor(this.posY);
             blockZ = MathHelper.floor(this.posZ + (l / 2 % 2 * 2 - 1) * 0.25F);
@@ -82,6 +88,16 @@ public class EntityUMSnowGolem extends EntityStackGolem
                 this.world.setBlockState(pos, Blocks.SNOW_LAYER.getDefaultState());
             }
         }
+    }
+
+    @Override
+    protected SoundEvent getHurtSound(DamageSource damageSource) {
+        return SoundEvents.ENTITY_SNOWMAN_HURT;
+    }
+
+    @Override
+    protected SoundEvent getDeathSound() {
+        return SoundEvents.ENTITY_SNOWMAN_DEATH;
     }
 
     @Override

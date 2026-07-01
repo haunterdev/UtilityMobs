@@ -34,6 +34,8 @@ public class GuiTurretGolem extends GuiContainer {
     private GuiButton passiveButton;
     private GuiButton neutralButton;
     private GuiButton targetModeButton;
+    /// Whether the "?" help button is shown (general.show_help_button); also gates its tooltip.
+    private boolean helpButton;
 
     public GuiTurretGolem(InventoryPlayer playerInv, EntityTurretGolem turret) {
         super(new ContainerTurretGolem(playerInv, turret));
@@ -62,7 +64,11 @@ public class GuiTurretGolem extends GuiContainer {
         this.buttonList.add(this.neutralButton);
         this.buttonList.add(this.targetModeButton);
         // Help button - compact square tucked in the top-right corner; opens the guide's Turret Upgrades page.
-        this.buttonList.add(new BorderedButton(4, this.guiLeft + this.xSize - 22, this.guiTop + 6, 14, 14, "?"));
+        // Gated by general.show_help_button, matching the block-golem/steam-golem GUIs.
+        this.helpButton = toast.utilityMobs.Properties.getBoolean(toast.utilityMobs.Properties.GENERAL, "show_help_button");
+        if (this.helpButton) {
+            this.buttonList.add(new BorderedButton(4, this.guiLeft + this.xSize - 22, this.guiTop + 6, 14, 14, "?"));
+        }
     }
 
     private String outlineLabel() {
@@ -125,6 +131,9 @@ public class GuiTurretGolem extends GuiContainer {
         }
     }
 
+    /** Opens the guide book directly to the "Turret Upgrades" category page. TurretGuide pushes the
+        landing page underneath first, so the category's back arrow still returns to the book root -
+        avoiding the old "stuck with no way back" problem that an unparented category GUI caused. */
     private void openUpgradesGuide() {
         TurretGuide.openUpgrades();
     }
@@ -243,7 +252,10 @@ public class GuiTurretGolem extends GuiContainer {
         // re-draws it in DrawScreenEvent.Post at LOWEST priority (i.e. after JEI) so it lands on top.
     }
 
+    /** Draws the "?" help-button tooltip when hovered. Called from {@link HelpTooltipHandler} in
+        DrawScreenEvent.Post so it renders above JEI's overlay (see drawScreen). */
     void drawHelpTooltip(int mouseX, int mouseY) {
+        if (!this.helpButton) return;
         int qx = this.guiLeft + this.xSize - 22, qy = this.guiTop + 6;
         if (mouseX >= qx && mouseX < qx + 14 && mouseY >= qy && mouseY < qy + 14) {
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
@@ -253,6 +265,7 @@ public class GuiTurretGolem extends GuiContainer {
         }
     }
 
+    /** Draws "Label: old" or "Label: old -> new" with the new value gradient-tinted. Returns next y. */
     private int drawStatRow(String labelKey, String oldVal, String newVal, int accent, int x, int y) {
         String label = I18n.format(labelKey) + ": ";
         this.fontRenderer.drawString(label, x, y, 0x404040);
@@ -270,6 +283,7 @@ public class GuiTurretGolem extends GuiContainer {
         return y + 10;
     }
 
+    /** Dark->bright vertical gradient of the accent color behind the new value. */
     private void drawGradientCell(int x, int y, int w, int h, int accent) {
         int r = (accent >> 16) & 0xFF, g = (accent >> 8) & 0xFF, b = accent & 0xFF;
         int dark = 0xFF000000 | ((r / 3) << 16) | ((g / 3) << 8) | (b / 3);
@@ -287,6 +301,12 @@ public class GuiTurretGolem extends GuiContainer {
         return s.projectiles > 1 ? d + " ×" + s.projectiles : d;
     }
 
+    /**
+        A vanilla {@link GuiButton} shorter than 20px tall samples only the top {@code height} pixels of
+        the 20px-tall widget graphic, which clips off the button's bottom border row - every short button
+        looks cut off at the bottom. This variant draws the body minus a 3px bottom strip, then re-draws
+        that strip from the texture's own bottom 3 pixels, so the frame closes cleanly at any height.
+     */
     private static final class BorderedButton extends GuiButton {
         private static final int BORDER = 3;
 
@@ -322,6 +342,11 @@ public class GuiTurretGolem extends GuiContainer {
         }
     }
 
+    /**
+        Re-draws the "?" help tooltip in DrawScreenEvent.Post at LOWEST priority so it paints AFTER JEI's
+        ingredient overlay (also drawn in Post) and therefore lands on top of JEI items. Registered once
+        in ClientProxy. See {@link #drawHelpTooltip}.
+     */
     public static final class HelpTooltipHandler {
         @SubscribeEvent(priority = EventPriority.LOWEST)
         public void onDrawScreenPost(GuiScreenEvent.DrawScreenEvent.Post event) {

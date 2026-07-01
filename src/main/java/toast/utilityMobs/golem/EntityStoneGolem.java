@@ -1,5 +1,6 @@
 package toast.utilityMobs.golem;
 
+import net.minecraft.block.SoundType;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.Item;
@@ -13,6 +14,12 @@ public class EntityStoneGolem extends EntityUtilityGolem
 {
     /// The texture for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "golem/stonegolem.png");
+
+    @Override
+    protected SoundType getGolemSoundType() {
+        return SoundType.STONE;
+    }
+
 
     public EntityStoneGolem(World world) {
         super(world);

@@ -118,7 +118,11 @@ public class EntityAIWeaponAttack extends EntityAIBase
             if (this.golem.getDistanceSq(this.target.posX, this.target.getEntityBoundingBox().minY, this.target.posZ) <= reach) {
                 if (this.golem.golemAttackTime <= 0) {
                     this.golem.golemAttackTime = 20;
-                    this.golem.swingArm(EnumHand.MAIN_HAND);
+                    // Broadcast the attack via entity-status 4 (the reliable status channel that already
+                    // drives the large golems' hitTime arm-raise). Large golems turn it into hitTime; the
+                    // biped-model golems turn it into a client-side swingArm (see EntityUtilityGolem). The
+                    // bare server swingArm/SPacketAnimation was not animating the biped models in-game.
+                    this.golem.world.setEntityState(this.golem, (byte)4);
                     this.golem.attackEntityAsMob(this.target);
                 }
             }

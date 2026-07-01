@@ -5,6 +5,7 @@ import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.entity.Entity;
 import toast.utilityMobs.colossal.EntityColossalGolem;
 
+
 public class ModelColossalGolem extends ModelBase
 {
     private static final float TO_RADS = (float) Math.PI / 180.0F;

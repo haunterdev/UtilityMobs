@@ -9,6 +9,11 @@ import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
+/**
+    The mod's creative tab. The mod registers no items of its own - its content is the utility
+    mob spawn eggs (one per registered entity) plus the NBT manual/upgrade/target books, all
+    injected here via displayAllRelevantItems.
+ */
 public class CreativeTabUtilityMobs extends CreativeTabs
 {
     public static final CreativeTabUtilityMobs INSTANCE = new CreativeTabUtilityMobs();

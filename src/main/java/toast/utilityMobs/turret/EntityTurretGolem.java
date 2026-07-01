@@ -31,6 +31,7 @@ import net.minecraft.world.World;
 import toast.utilityMobs.EnumUpgrade;
 import toast.utilityMobs.TargetHelper;
 import toast.utilityMobs.UMSound;
+import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.ai.EntityAIGolemTarget;
 import toast.utilityMobs.ai.EntityAITurretAttack;
 import toast.utilityMobs.golem.EntityUtilityGolem;
@@ -320,7 +321,9 @@ public class EntityTurretGolem extends EntityUtilityGolem
     /// Ammo model accessors. getAmmoItem/getAmmoPerShot are overridable per turret type (defaults retunable).
     public InventoryBasic getAmmoInventory() { return this.ammoInventory; }
     public net.minecraft.item.Item getAmmoItem() { return net.minecraft.init.Items.ARROW; }
-    public int getAmmoPerShot() { return 1; }
+    /// Ammo drawn per attack == projectiles fired that attack, so a shotgun/volley (6 shots) burns 6 ammo
+    /// and a single-shot turret burns 1. Overridable if a type ever decouples the two.
+    public int getAmmoPerShot() { return this.getProjectileCount(); }
     public boolean requiresAmmo() { return toast.utilityMobs.Properties.getBoolean("turrets", "require_ammo"); }
 
     /// True if the ammo inventory holds at least one matching ammo item.

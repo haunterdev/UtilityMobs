@@ -22,6 +22,7 @@ public enum EnumUpgrade
     POISON("poison", Items.SPIDER_EYE, 0x4E9B2D),
     FIRE_EXPLOSIVE("fire_explosive", Items.FIRE_CHARGE, 0xF0A030);
 
+
     // Returns the appropriate upgrade out of the array of allowed upgrades.
     public static EnumUpgrade getUpgrade(EnumUpgrade[] upgrades, ItemStack upgradeStack) {
         if (upgradeStack != null && !upgradeStack.isEmpty()) {

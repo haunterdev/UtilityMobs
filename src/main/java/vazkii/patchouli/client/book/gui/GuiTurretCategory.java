@@ -10,6 +10,18 @@ import vazkii.patchouli.client.book.BookEntry;
 import vazkii.patchouli.client.book.gui.button.GuiButtonEntry;
 import vazkii.patchouli.common.book.Book;
 
+/**
+    Patchouli's category landing page hardcodes {@link GuiBookEntryList#ENTRIES_IN_FIRST_PAGE} (11)
+    entries on the first page; the turrets category has 12 entries, so the 12th (Killer) spilled onto
+    a second page that required flipping forward to see. This subclass - deliberately declared in
+    Patchouli's own package so it can touch GuiBookEntryList's package-private list/page state - lets
+    the first page hold the 12th entry and collapses the now-empty second page.
+
+    The referenced Patchouli members (book, page, maxpages, bookLeft, bookTop, visibleEntries,
+    dependentButtons, buildEntryButtons, GuiBookCategory.category) are Patchouli's own names and are
+    NOT remapped by reobf, so this compiles and runs identically in dev and in a packaged jar. The
+    OpenHandler swaps the stock GUI for this one; it is registered in ClientProxy.
+ */
 public class GuiTurretCategory extends GuiBookCategory {
 
     public static final ResourceLocation TURRETS = new ResourceLocation("utilitymobs", "turrets");
@@ -36,6 +48,7 @@ public class GuiTurretCategory extends GuiBookCategory {
         }
     }
 
+    /** Replaces Patchouli's stock turrets-category page with the 12-entry variant. */
     public static class OpenHandler {
         @SubscribeEvent
         public void onGuiOpen(GuiOpenEvent event) {

@@ -3,6 +3,20 @@ package toast.utilityMobs;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Lightweight, opt-in performance profiler for the golem AI / collision hot paths.
+ *
+ * Toggled by the {@code golems.performance_logging} config flag (mirrored into {@link #enabled}
+ * by {@link Properties#load()}). When disabled, {@link #start()} returns 0 and every record call
+ * short-circuits, so the instrumentation costs a single boolean check on the hot path.
+ *
+ * Timers track wall-clock nanos + call counts; counters track running totals (e.g. how many
+ * entities were scanned, how many raytraces ran, how many collision pushes were capped). Stats
+ * are dumped to the console and reset on a fixed interval by {@link TickHandler}.
+ *
+ * Methods are synchronized because {@code collideWithNearbyEntities} can run on both the integrated
+ * server thread and the client thread; contention is negligible since profiling is a diagnostic mode.
+ */
 public final class UMProfiler {
     /// Master switch, set from the golems.performance_logging config flag.
     public static volatile boolean enabled = false;

@@ -2,6 +2,7 @@ package toast.utilityMobs.golem;
 
 import java.util.List;
 
+import net.minecraft.block.SoundType;
 import net.minecraft.entity.IEntityLivingData;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.EntityAILookIdle;
@@ -27,6 +28,12 @@ public class EntityMelonGolem extends EntityStackGolem
 {
     // The texture for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "golem/melongolem.png");
+
+    @Override
+    protected SoundType getGolemSoundType() {
+        return SoundType.WOOD;
+    }
+
 
     public EntityMelonGolem(World world) {
         super(world);

@@ -14,6 +14,7 @@ import net.minecraftforge.fml.client.config.IConfigElement;
 import toast.utilityMobs.Properties;
 import toast.utilityMobs._UtilityMobs;
 
+/** Provides the in-game "Mods > Utility Mobs > Config" screen, backed by the mod Configuration. */
 public class GuiFactory implements IModGuiFactory {
 
     @Override
@@ -36,7 +37,7 @@ public class GuiFactory implements IModGuiFactory {
                 }
             }
         }
-        return new GuiConfig(parent, elements, _UtilityMobs.MODID, false, false, "Utility Mobs");
+        return new GuiUtilityMobsConfig(parent, elements, _UtilityMobs.MODID, "Utility Mobs");
     }
 
     @Override

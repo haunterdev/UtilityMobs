@@ -5,6 +5,7 @@ import java.util.List;
 
 import toast.utilityMobs.EnumUpgrade;
 
+/** Single source of truth for a turret's displayed combat stats, base and upgraded. */
 public class TurretStats {
     public double rawDamage;       // arrow damage before velocity scaling
     public int projectiles;
@@ -29,6 +30,7 @@ public class TurretStats {
         this.velocity = velocity;
     }
 
+    /** Per-hit damage shown to the player. */
     public double displayedDamage() {
         if (!this.arrowBased) {
             return this.displayDamageOverride;
@@ -71,6 +73,7 @@ public class TurretStats {
         return s;
     }
 
+    /** Returns a NEW stats object with the upgrade applied. Mirrors EnumUpgrade.applyToArrow. */
     public static TurretStats withUpgrade(EntityTurretGolem turret, EnumUpgrade upgrade) {
         TurretStats s = base(turret);
         if (upgrade == null || upgrade == EnumUpgrade.DEFAULT) {
@@ -119,11 +122,13 @@ public class TurretStats {
         s.effectColors.add(color);
     }
 
+    /** Convenience: build stats for the turret's currently equipped upgrade (slot 0). */
     public static TurretStats current(EntityTurretGolem turret) {
         EnumUpgrade up = EnumUpgrade.getUpgrade(turret.upgrades, turret.getEquipmentInSlot(0));
         return withUpgrade(turret, up);
     }
 
+    /** True when an upgrade changed a numeric stat vs base (for arrow direction display). */
     public boolean damageDiffersFrom(TurretStats other) {
         return Math.abs(this.displayedDamage() - other.displayedDamage()) > 0.0001 || this.projectiles != other.projectiles;
     }

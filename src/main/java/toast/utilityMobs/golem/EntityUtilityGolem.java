@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import javax.annotation.Nullable;
 
+import net.minecraft.block.SoundType;
 import net.minecraft.block.material.Material;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.init.Enchantments;
@@ -31,7 +32,9 @@ import net.minecraft.network.datasync.DataParameter;
 import net.minecraft.network.datasync.DataSerializers;
 import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.scoreboard.Team;
+import net.minecraft.init.SoundEvents;
 import net.minecraft.util.DamageSource;
+import net.minecraft.util.SoundEvent;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.MathHelper;
@@ -125,6 +128,34 @@ public abstract class EntityUtilityGolem extends EntityGolem implements IEntityO
         this.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE).setBaseValue(1.0);
     }
 
+    /// The block-material sound set that flavors this golem's hurt/death/step sounds.
+    /// Return null (default) to keep the vanilla iron-golem sounds.
+    protected SoundType getGolemSoundType() {
+        return null;
+    }
+
+    @Override
+    protected SoundEvent getHurtSound(DamageSource damageSource) {
+        SoundType type = this.getGolemSoundType();
+        return type == null ? SoundEvents.ENTITY_IRONGOLEM_HURT : type.getHitSound();
+    }
+
+    @Override
+    protected SoundEvent getDeathSound() {
+        SoundType type = this.getGolemSoundType();
+        return type == null ? SoundEvents.ENTITY_IRONGOLEM_DEATH : type.getBreakSound();
+    }
+
+    @Override
+    protected void playStepSound(net.minecraft.util.math.BlockPos pos, net.minecraft.block.Block block) {
+        SoundType type = this.getGolemSoundType();
+        if (type == null) {
+            super.playStepSound(pos, block);
+            return;
+        }
+        this.playSound(type.getStepSound(), type.getVolume() * 0.15F, type.getPitch());
+    }
+
     /// Returns the texture for this mob.
     public ResourceLocation getTexture() {
         return this.texture;
@@ -138,6 +169,27 @@ public abstract class EntityUtilityGolem extends EntityGolem implements IEntityO
         }
         this.golemAttackTime = Math.max(this.golemAttackTime - 1, 0);
         super.onUpdate();
+        // EntityGolem (our parent) never advances the vanilla arm-swing the way EntityMob does, so
+        // swingProgressInt stays frozen and the biped-model golems never visibly swing. Tick it here
+        // ourselves so swingArm() from handleStatusUpdate(4) animates. MUST run AFTER super.onUpdate():
+        // onEntityUpdate (inside super) sets prevSwingProgress = swingProgress at its top, so advancing
+        // the swing before super would leave prev == current every tick -> no interpolation -> choppy
+        // swing. Ticking after super mirrors EntityMob's cadence and keeps the swing smooth.
+        this.updateArmSwingProgress();
+    }
+
+    /// The melee AI broadcasts entity-status 4 on each hit. Large golems override this to drive their
+    /// hitTime arm-raise; the biped-model golems (armor/gilded/bound-soul/stone/scarecrow) turn it into a
+    /// client-side vanilla arm swing here. Routing through the status channel (not the bare SPacketAnimation
+    /// swingArm) is what actually animates these models in-game.
+    @Override
+    public void handleStatusUpdate(byte id) {
+        if (id == 4) {
+            this.swingArm(EnumHand.MAIN_HAND);
+        }
+        else {
+            super.handleStatusUpdate(id);
+        }
     }
 
     /// Returns the held item; client renders a stick when the fishing rod flag is off.

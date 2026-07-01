@@ -1,0 +1,115 @@
+# Translate by MrKoteo
+entity.UMFishHook.name=Рыболовный крючок
+
+entity.GenericGolem.name=Голем
+
+entity.AnvilGolem.name=Голем-наковальня
+entity.ChestEnderGolem.name=Голем из эндер-сундука
+entity.ChestGolem.name=Голем-сундук
+entity.ChestTrappedGolem.name=Голем-ловушка
+entity.FurnaceGolem.name=Голем из печи
+entity.JukeboxGolem.name=Голем-музыкальный автомат
+entity.LanternGolem.name=Голем из тыквы-фонаря
+entity.WorkbenchGolem.name=Голем-верстак
+
+entity.ArmorGolem.name=Бронированный голем
+entity.BoundSoul.name=Связанная душа
+entity.GildedGolem.name=Позолоченный голем
+entity.MelonGolem.name=Арбузный голем
+entity.ObsidianGolem.name=Обсидиановый голем
+entity.Scarecrow.name=Пугало
+entity.SteamGolem.name=Паровой голем
+entity.StoneGolem.name=Каменный голем
+entity.StoneLargeGolem.name=Большой каменный голем
+entity.UMIronGolem.name=Улучшенный железный голем
+entity.UMSnowGolem.name=Улучшенный снежный голем
+
+entity.BrickTurret.name=Турель из каменного кирпича
+entity.FireballTurret.name=Турель огненных шаров
+entity.FireTurret.name=Огненная турель
+entity.GatlingTurret.name=Турель-пулемёт
+entity.GhastTurret.name=Турель гаста
+entity.KillerTurret.name=Турель-убийца
+entity.ObsidianTurret.name=Обсидиановая турель
+entity.ShotgunTurret.name=Дробовик-турель
+entity.SniperTurret.name=Снайперская турель
+entity.SnowTurret.name=Снежная турель
+entity.StoneTurret.name=Каменная турель
+entity.VolleyTurret.name=Залповая турель
+
+entity.ArmorColossus.name=Бронированный колосс
+entity.ObsidianColossus.name=Обсидиановый колосс
+entity.StoneColossus.name=Каменный колосс
+
+itemGroup.utilitymobs=Вспомогательные мобы
+
+utilitymobs.gui.range_on=Дальность: ВКЛ
+utilitymobs.gui.range_off=Дальность: ВЫКЛ
+utilitymobs.gui.hostile_on=Враждебные: ВКЛ
+utilitymobs.gui.hostile_off=Враждебные: ВЫКЛ
+utilitymobs.gui.passive_on=Пассивные: ВКЛ
+utilitymobs.gui.passive_off=Пассивные: ВЫКЛ
+utilitymobs.stat.health=Здоровье
+utilitymobs.stat.armor=Броня
+utilitymobs.stat.damage=Урон
+utilitymobs.stat.firerate=Скорострельность
+utilitymobs.stat.range=Дальность
+utilitymobs.stat.accuracy=Точность
+utilitymobs.effect.ignite=Поджигание (5 с)
+utilitymobs.effect.explode=Взрыв
+utilitymobs.effect.explode_fire=Огненный взрыв
+utilitymobs.effect.poison=Отравление (3 с)
+utilitymobs.effect.slow=Замедление (3 с)
+utilitymobs.effect.egg=Убивает слабых яйцом
+utilitymobs.effect.mobile=Подвижность
+utilitymobs.effect.knockback=Отбрасывание
+utilitymobs.effect.aoe=Поражает всех рядом
+utilitymobs.gui.target_close=Цель: Ближний
+utilitymobs.gui.target_far=Цель: Дальний
+utilitymobs.gui.target_strong=Цель: Сильный
+utilitymobs.gui.target_weak=Цель: Слабый
+utilitymobs.gui.ammo=Боеприпасы
+
+# Config GUI
+utilitymobs.cfg.cat.general=Основное
+utilitymobs.cfg.cat.turrets=Турели
+utilitymobs.cfg.cat.golems=Рабочие големы
+utilitymobs.cfg.cat.colossals=Колоссы
+utilitymobs.cfg.cat.build=Строимые мобы
+utilitymobs.cfg.cat.build.golems=Рабочие големы
+utilitymobs.cfg.cat.build.turrets=Турели
+utilitymobs.cfg.cat.build.blocks=Блочные големы
+utilitymobs.cfg.cat.build.hostiles=Враждебные големы
+utilitymobs.cfg.cat.build.colossals=Колоссы
+utilitymobs.cfg.master_toggle=Главный переключатель
+utilitymobs.cfg.general.give_book_on_first_join=Давать книгу при первом входе
+utilitymobs.cfg.general.alternate_manuals=Альтернативные рецепты руководств
+utilitymobs.cfg.general.creeper_head_rarity=Редкость выпадения головы крипера
+utilitymobs.cfg.general.hostile=Все мобы враждебны к игрокам
+utilitymobs.cfg.general.wither_conversion=Рецепт превращения черепа визера в скелета
+utilitymobs.cfg.general.skull_rarity=Редкость выпадения черепа скелета
+utilitymobs.cfg.turrets.require_ammo=Требовать боеприпасы
+utilitymobs.cfg.turrets.friendly_passthrough=Сквозной пролёт дружественных снарядов
+utilitymobs.cfg.turrets.no_mob_aggro=Мобы игнорируют турели
+utilitymobs.cfg.turrets.drop_chance=Шанс выпадения блока
+utilitymobs.cfg.turrets.collision=Твёрдые (проходимые) турели
+utilitymobs.cfg.golems.attack_hostiles=Атаковать враждебных мобов
+utilitymobs.cfg.golems.attack_passives=Атаковать пассивных мобов
+utilitymobs.cfg.golems.performance_logging=Журналирование производительности
+utilitymobs.cfg.golems.target_scan_interval=Интервал сканирования целей (тики)
+utilitymobs.cfg.golems.target_raytrace_cap=Максимальная дальность прямой видимости
+utilitymobs.cfg.golems.collision_push_cap=Максимум столкновений для толчка
+utilitymobs.cfg.golems.collision_disable_density=Плотность отключения столкновений
+utilitymobs.cfg.golems.collision_interval=Интервал проверки столкновений
+utilitymobs.cfg.golems.active_range=Активная дальность (блоки)
+utilitymobs.cfg.golems.follow_teleports_per_tick=Телепортов следования за тик
+utilitymobs.cfg.golems.wander_budget=Бюджет блуждания за тик
+utilitymobs.cfg.colossals.attack_hostiles=Атаковать враждебных мобов
+utilitymobs.cfg.colossals.attack_passives=Атаковать пассивных мобов
+utilitymobs.cfg.colossals.wander_while_ridden=Блуждать, когда на нём едут
+utilitymobs.cfg.golems.attack_neutrals=Атаковать нейтральных мобов
+utilitymobs.cfg.colossals.attack_neutrals=Атаковать нейтральных мобов
+utilitymobs.gui.neutral_on=Нейтральные: ВКЛ
+utilitymobs.gui.neutral_off=Нейтральные: ВЫКЛ
+utilitymobs.cfg.build.golems.UMIronGolem=Улучшение ванильного железного голема
+utilitymobs.cfg.build.golems.UMSnowGolem=Улучшение ванильного снежного голема

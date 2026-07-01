@@ -1,5 +1,6 @@
 package toast.utilityMobs.golem;
 
+import net.minecraft.block.SoundType;
 import net.minecraft.entity.IEntityLivingData;
 import net.minecraft.entity.SharedMonsterAttributes;
 import net.minecraft.entity.ai.EntityAILookIdle;
@@ -7,6 +8,7 @@ import net.minecraft.entity.ai.EntityAIWander;
 import net.minecraft.entity.ai.EntityAIWatchClosest;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
+import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemMonsterPlacer;
 import net.minecraft.item.ItemStack;
@@ -24,6 +26,12 @@ public class EntityScarecrow extends EntityUtilityGolem
 {
     /// The texture for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "golem/scarecrow.png");
+
+    @Override
+    protected SoundType getGolemSoundType() {
+        return SoundType.CLOTH;
+    }
+
 
     public EntityScarecrow(World world) {
         super(world);
@@ -66,8 +74,10 @@ public class EntityScarecrow extends EntityUtilityGolem
 
     @Override
     protected void dropFewItems(boolean recentlyHit, int looting, float dropChance) {
+        // Drop sticks rather than the specific (oak) fence, since a scarecrow can now be built from
+        // any wooden fence via the fenceWood ore dict - sticks are the neutral common denominator.
         for (int i = this.rand.nextInt(3); i-- > 0;) {
-            this.dropItem(Item.getItemFromBlock(Blocks.OAK_FENCE), 1);
+            this.dropItem(Items.STICK, 2);
         }
         if (this.rand.nextInt(2) == 0) {
             this.dropItem(this.getDropItem(), 1);

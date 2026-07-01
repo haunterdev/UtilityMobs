@@ -9,6 +9,10 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 import vazkii.patchouli.api.PatchouliAPI;
 
+/**
+    Glue for the Patchouli guide book ("utilitymobs:guide"). Provides the book
+    stack, a server-side open helper, and the config-gated give-on-first-join handler.
+ */
 public final class GuideBook
 {
     // Patchouli book id: <namespace>:<book folder under assets/<ns>/patchouli_books/>.

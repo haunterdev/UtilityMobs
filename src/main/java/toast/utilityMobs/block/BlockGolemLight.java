@@ -13,6 +13,12 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 
+/**
+ * An invisible, non-solid, full-bright block placed by the Jack o'Lantern Golem so it lights the area
+ * around itself as it moves (like a real jack o'lantern, light level 15). The golem clears the previous
+ * light when it walks; this block also schedules its own removal if no lantern golem is nearby, so stray
+ * lights never linger (e.g. after a chunk unloads).
+ */
 public class BlockGolemLight extends Block
 {
     public BlockGolemLight() {
@@ -96,6 +102,7 @@ public class BlockGolemLight extends Block
         return state.getBlock().isReplaceable(world, pos);
     }
 
+    /** Helper used by the golem: this position is safe to overwrite with a light. */
     public static boolean isLightReplaceable(World world, BlockPos pos) {
         IBlockState state = world.getBlockState(pos);
         Block block = state.getBlock();

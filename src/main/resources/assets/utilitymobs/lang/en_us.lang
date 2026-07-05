@@ -163,3 +163,5 @@ utilitymobs.setup.desc.huge_armies=Tune golem collision for thousands of golems 
 utilitymobs.cfg.general.heal_numbers=Heal Numbers
 utilitymobs.cfg.general.show_help_button=Show Help Button
 utilitymobs.cfg.general.attack_blacklist=Attack Blacklist
+utilitymobs.cfg.general.attack_whitelist=Attack Whitelist
+utilitymobs.cfg.golems.melon_heal_range=Melon Golem Heal Range (blocks)

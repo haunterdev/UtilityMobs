@@ -262,8 +262,14 @@ public class _UtilityMobs
     // Registers this mod's server commands.
     @Mod.EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
+        // Rebuild the global attack lists now that every mod has finished registering its entities. Entries
+        // resolved at our preInit could miss modded classes registered after us (mod load order); re-running
+        // the config load here fills in subclass coverage for those. Registry-id matching already handles the
+        // rest regardless of order. See TargetHelper.loadGlobalList.
+        Properties.reload();
         event.registerServerCommand(new CommandUMSummon());
         event.registerServerCommand(new CommandUMBlacklist());
+        event.registerServerCommand(new CommandUMWhitelist());
     }
 
     // Inserts a space before every capital letter (except the first).

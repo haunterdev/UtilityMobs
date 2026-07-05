@@ -19,6 +19,7 @@ balance and performance adjustments.
 - **Colossal golems.** Armor, obsidian, and stone colossi - giant rideable golems built from a single block type. Left-click to swing their arms; they soak damage for the rider.
 - **Turret upgrades.** Fire, explosive, fire-explosive, killer, feather, slow, sight, poison, and egg upgrades swap onto a turret and change how it shoots.
 - **Target Book.** A per-player targeting filter - toggle hostile / passive / neutral, and pick nearest, farthest, strongest, or weakest target modes. Multiplayer-safe, keyed to the owner.
+- **Attack whitelist / blacklist.** Force golems and turrets to always attack, or never attack, any mob - vanilla or modded - via config or the `/umwhitelist` and `/umblacklist` commands (just look at a mob to add it). Modded hostiles are attacked out of the box.
 - **In-game guide book.** A Patchouli book with build guides (live multiblock projections), stat pages, and upgrade docs. Granted automatically on first join.
 - **Right-click healing.** Right-click a golem with its repair (drop) item to heal it - works on combat, block, and turret golems.
 - **`/umsummon` command.** Batch-spawn golems, turrets, or colossi for staged mob battles (`/umsummon <type> <count> [team|hostile]`).
@@ -34,7 +35,7 @@ balance and performance adjustments.
 ## Installation
 
 1. Install Minecraft Forge for 1.12.2.
-2. Drop Patchouli and `utilitymobs-3.1.1.jar` into your `mods` folder.
+2. Drop Patchouli and `utilitymobs-3.3.0.jar` into your `mods` folder.
 3. Launch the game. The guide book is granted automatically on first join (configurable).
 
 ## Building

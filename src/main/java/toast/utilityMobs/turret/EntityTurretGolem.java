@@ -113,7 +113,7 @@ public class EntityTurretGolem extends EntityUtilityGolem
         if (target instanceof EntityLivingBase && !(target instanceof EntityPlayer)) {
             if (toast.utilityMobs.TargetHelper.isNeutralMob(target)) {
                 if (!this.attacksNeutral()) return false;
-            } else if (target instanceof IMob) {
+            } else if (toast.utilityMobs.TargetHelper.isHostileMob(target)) {
                 if (!this.attacksHostile()) return false;
             } else {
                 if (!this.attacksPassive()) return false;

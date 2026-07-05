@@ -71,7 +71,7 @@ public class EntityColossalGolem extends EntityUtilityGolem
         if (target instanceof net.minecraft.entity.EntityLivingBase && !(target instanceof net.minecraft.entity.player.EntityPlayer)) {
             if (toast.utilityMobs.TargetHelper.isNeutralMob(target)) {
                 if (!toast.utilityMobs.Properties.getBoolean("colossals", "attack_neutrals")) return false;
-            } else if (target instanceof net.minecraft.entity.monster.IMob) {
+            } else if (toast.utilityMobs.TargetHelper.isHostileMob(target)) {
                 if (!toast.utilityMobs.Properties.getBoolean("colossals", "attack_hostiles")) return false;
             } else {
                 if (!toast.utilityMobs.Properties.getBoolean("colossals", "attack_passives")) return false;

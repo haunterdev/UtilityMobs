@@ -75,10 +75,12 @@ public class EntityUMSnowGolem extends EntityStackGolem
             this.attackEntityFrom(DamageSource.ON_FIRE, 1.0F);
         }
 
-        // Server-side only, and only when mobGriefing is on. Running this client-side painted ghost snow
-        // layers the server never placed (which lingered until a block update), so it looked like the
-        // golem ignored the gamerule. Vanilla snowman places snow server-side under the same rule.
-        boolean mobGriefing = !this.world.isRemote && this.world.getGameRules().getBoolean("mobGriefing");
+        // Server-side only, and only when mob griefing is allowed for THIS entity. Running this client-side
+        // painted ghost snow layers the server never placed (which lingered until a block update), so it
+        // looked like the golem ignored the gamerule. We ask Forge's per-entity mob-griefing event rather
+        // than the raw gamerule, so mods that gate griefing per mob (e.g. Universal Tweaks' "mob griefing"
+        // blacklist) can stop the snow trail - the raw gamerule ignored their per-entity override.
+        boolean mobGriefing = !this.world.isRemote && net.minecraftforge.event.ForgeEventFactory.getMobGriefingEvent(this.world, this);
         for (int l = 0; mobGriefing && l < 4; l++) {
             blockX = MathHelper.floor(this.posX + (l % 2 * 2 - 1) * 0.25F);
             blockY = MathHelper.floor(this.posY);

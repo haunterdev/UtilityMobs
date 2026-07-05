@@ -10,7 +10,10 @@ import net.minecraft.entity.player.EntityPlayer;
 public class EntityAIFollowEntity extends EntityAIBase
 {
     private final Class<? extends EntityLivingBase> followClass;
-    private final float rangeMin, rangeMax;
+    // rangeMax is fixed; rangeMin (the stop/park distance) is settable so a follower can tighten how close
+    // it gets - the melon golem tracks this to its heal range so it can reach a golem it needs to heal.
+    private float rangeMin;
+    private final float rangeMax;
     private final EntityGolem golem;
     private EntityLivingBase followEntity;
     private double moveSpeed;
@@ -25,6 +28,12 @@ public class EntityAIFollowEntity extends EntityAIBase
         this.rangeMin = min;
         this.rangeMax = max;
         this.setMutexBits(3);
+    }
+
+    /** Sets the park distance (how close the follower gets before it stops pathing). Clamped to stay
+        positive and below rangeMax so the follow logic can't invert. */
+    public void setRangeMin(float min) {
+        this.rangeMin = Math.max(0.5F, Math.min(min, this.rangeMax - 1.0F));
     }
 
     @Override

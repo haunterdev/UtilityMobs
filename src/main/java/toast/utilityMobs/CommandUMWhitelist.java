@@ -25,25 +25,26 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.common.config.Property;
 
 /**
- * /umblacklist add|remove [entity] | list | clear
+ * /umwhitelist add|remove [entity] | list | clear
  *
- * Admin tool for the global attack blacklist (general.attack_blacklist) - entity types golems/turrets
- * never target. "add"/"remove" with no entity argument act on whatever entity the player is looking at
- * (point-and-blacklist); with an argument they take an entity registry id (e.g. minecraft:cow). Edits the
- * config and live-reloads, so changes take effect immediately without a restart.
+ * Admin tool for the global attack whitelist (general.attack_whitelist) - entity types golems/turrets
+ * ALWAYS target even when the matching attack_* category toggle is off. Mirror of /umblacklist and edits the
+ * same config option, so command and in-game config screen stay in sync. "add"/"remove" with no entity
+ * argument act on whatever entity the player is looking at (point-and-whitelist); with an argument they take
+ * an entity registry id (e.g. minecraft:cow). Edits the config and live-reloads, effective immediately.
  */
-public class CommandUMBlacklist extends CommandBase {
+public class CommandUMWhitelist extends CommandBase {
 
     private static final double LOOK_RANGE = 16.0;
 
     @Override
     public String getName() {
-        return "umblacklist";
+        return "umwhitelist";
     }
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/umblacklist <add|remove> [entityId] | list | clear - manage the global attack blacklist (no entityId = the mob you're looking at)";
+        return "/umwhitelist <add|remove> [entityId] | list | clear - manage the global attack whitelist (no entityId = the mob you're looking at)";
     }
 
     @Override
@@ -57,20 +58,20 @@ public class CommandUMBlacklist extends CommandBase {
             throw new WrongUsageException(this.getUsage(sender));
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
-        List<String> list = getBlacklist();
+        List<String> list = getWhitelist();
 
         if ("list".equals(sub)) {
             if (list.isEmpty()) {
-                notifyCommandListener(sender, this, "Global attack blacklist is empty.");
+                notifyCommandListener(sender, this, "Global attack whitelist is empty.");
             }
             else {
-                notifyCommandListener(sender, this, "Global attack blacklist (%s): %s", list.size(), String.join(", ", list));
+                notifyCommandListener(sender, this, "Global attack whitelist (%s): %s", list.size(), String.join(", ", list));
             }
             return;
         }
         if ("clear".equals(sub)) {
-            setBlacklist(new ArrayList<String>());
-            notifyCommandListener(sender, this, "Cleared the global attack blacklist.");
+            setWhitelist(new ArrayList<String>());
+            notifyCommandListener(sender, this, "Cleared the global attack whitelist.");
             return;
         }
         if (!"add".equals(sub) && !"remove".equals(sub)) {
@@ -82,7 +83,7 @@ public class CommandUMBlacklist extends CommandBase {
         if (args.length >= 2) {
             id = args[1];
             // Accept any namespaced registry id (contains ':') even if it doesn't resolve to a class right
-            // now - the blacklist matches by id at runtime, so a valid modded id must not be rejected here.
+            // now - the whitelist matches by id at runtime, so a valid modded id must not be rejected here.
             if (EntityList.getClass(new ResourceLocation(id)) == null && id.indexOf(':') < 0 && !"Player".equals(id) && !"Hostiles".equals(id)) {
                 throw new CommandException("Unknown entity id: " + id + " (use e.g. minecraft:cow, or look at a mob and omit the id).");
             }
@@ -94,39 +95,39 @@ public class CommandUMBlacklist extends CommandBase {
             }
             ResourceLocation key = EntityList.getKey(target);
             if (key == null) {
-                throw new CommandException("That entity has no registry id and can't be blacklisted by looking at it.");
+                throw new CommandException("That entity has no registry id and can't be whitelisted by looking at it.");
             }
             id = key.toString();
         }
 
         if ("add".equals(sub)) {
             if (list.contains(id)) {
-                notifyCommandListener(sender, this, "%s is already on the global attack blacklist.", id);
+                notifyCommandListener(sender, this, "%s is already on the global attack whitelist.", id);
                 return;
             }
             list.add(id);
-            setBlacklist(list);
-            notifyCommandListener(sender, this, "Added %s to the global attack blacklist.", id);
+            setWhitelist(list);
+            notifyCommandListener(sender, this, "Added %s to the global attack whitelist.", id);
         }
         else {
             if (!list.remove(id)) {
-                notifyCommandListener(sender, this, "%s was not on the global attack blacklist.", id);
+                notifyCommandListener(sender, this, "%s was not on the global attack whitelist.", id);
                 return;
             }
-            setBlacklist(list);
-            notifyCommandListener(sender, this, "Removed %s from the global attack blacklist.", id);
+            setWhitelist(list);
+            notifyCommandListener(sender, this, "Removed %s from the global attack whitelist.", id);
         }
     }
 
-    // Reads the current blacklist entries from the live config.
-    private static List<String> getBlacklist() {
-        Property prop = Properties.config.get(Properties.GENERAL, "attack_blacklist", new String[0]);
+    // Reads the current whitelist entries from the live config.
+    private static List<String> getWhitelist() {
+        Property prop = Properties.config.get(Properties.GENERAL, "attack_whitelist", new String[0]);
         return new ArrayList<String>(Arrays.asList(prop.getStringList()));
     }
 
-    // Writes the blacklist back to config, saves, and live-reloads so TargetHelper picks it up at once.
-    private static void setBlacklist(List<String> entries) {
-        Property prop = Properties.config.get(Properties.GENERAL, "attack_blacklist", new String[0]);
+    // Writes the whitelist back to config, saves, and live-reloads so TargetHelper picks it up at once.
+    private static void setWhitelist(List<String> entries) {
+        Property prop = Properties.config.get(Properties.GENERAL, "attack_whitelist", new String[0]);
         prop.set(entries.toArray(new String[entries.size()]));
         Properties.config.save();
         Properties.reload();

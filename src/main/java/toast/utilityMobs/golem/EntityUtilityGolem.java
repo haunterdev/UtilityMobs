@@ -137,13 +137,29 @@ public abstract class EntityUtilityGolem extends EntityGolem implements IEntityO
     @Override
     protected SoundEvent getHurtSound(DamageSource damageSource) {
         SoundType type = this.getGolemSoundType();
-        return type == null ? SoundEvents.ENTITY_IRONGOLEM_HURT : type.getHitSound();
+        // Use the block BREAK sound (not the quiet dig "hit" sound, which read as a footstep - issue #1/#4
+        // follow-up). playHurtSound below plays it lighter/higher so a hit sounds like the block chipping
+        // while death (getDeathSound) is the full break.
+        return type == null ? SoundEvents.ENTITY_IRONGOLEM_HURT : type.getBreakSound();
     }
 
     @Override
     protected SoundEvent getDeathSound() {
         SoundType type = this.getGolemSoundType();
         return type == null ? SoundEvents.ENTITY_IRONGOLEM_DEATH : type.getBreakSound();
+    }
+
+    @Override
+    protected void playHurtSound(DamageSource source) {
+        SoundType type = this.getGolemSoundType();
+        if (type == null) {
+            super.playHurtSound(source);
+            return;
+        }
+        // Block-typed golem: a hit chips the block. Play the BREAK sound at reduced volume and a slightly
+        // higher pitch so it clearly reads as "block breaking" (Grande's request) yet stays distinct from
+        // the full-volume death break.
+        this.playSound(type.getBreakSound(), type.getVolume() * 0.7F, type.getPitch() * 1.2F);
     }
 
     @Override
@@ -609,7 +625,7 @@ public abstract class EntityUtilityGolem extends EntityGolem implements IEntityO
         if (target instanceof EntityLivingBase && !(target instanceof EntityPlayer)) {
             if (toast.utilityMobs.TargetHelper.isNeutralMob(target)) {
                 if (!toast.utilityMobs.Properties.getBoolean("golems", "attack_neutrals")) return false;
-            } else if (target instanceof net.minecraft.entity.monster.IMob) {
+            } else if (toast.utilityMobs.TargetHelper.isHostileMob(target)) {
                 if (!toast.utilityMobs.Properties.getBoolean("golems", "attack_hostiles")) return false;
             } else {
                 if (!toast.utilityMobs.Properties.getBoolean("golems", "attack_passives")) return false;
@@ -634,7 +650,9 @@ public abstract class EntityUtilityGolem extends EntityGolem implements IEntityO
         // Enemy-team golems are always valid combat targets - bypass the hostile/passive config gate so
         // dyed/`/umsummon` team golems fight regardless of golems.attack_passives. isValidTarget (owner +
         // whitelist) and range checks below still apply.
-        if (!this.isEnemyTeam(target) && !this.passesTargetFilter(target)) {
+        // Enemy-team golems and globally-whitelisted entities (general.attack_whitelist) bypass the
+        // hostile/passive/neutral category gate so they are attacked even with the attack_* toggle off.
+        if (!this.isEnemyTeam(target) && !toast.utilityMobs.TargetHelper.isGloballyWhitelisted(target) && !this.passesTargetFilter(target)) {
             return false;
         }
         double range = this.getEntityAttribute(SharedMonsterAttributes.FOLLOW_RANGE).getAttributeValue();

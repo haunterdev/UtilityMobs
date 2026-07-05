@@ -29,6 +29,14 @@ public class EntityMelonGolem extends EntityStackGolem
     // The texture for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "golem/melongolem.png");
 
+    // How near (blocks) a melon golem must be to heal another golem. Cached from golems.melon_heal_range.
+    public static float healRange = 16.0F;
+
+    // The follow AI, kept so its park distance can track healRange - otherwise a low heal range would leave
+    // the melon golem parked (at the default follow distance) too far away to ever heal (issue: never
+    // pathfinds close enough at small ranges).
+    private final EntityAIFollowEntity followAI;
+
     @Override
     protected SoundType getGolemSoundType() {
         return SoundType.WOOD;
@@ -43,7 +51,8 @@ public class EntityMelonGolem extends EntityStackGolem
         this.setEquipDropChance(4, 0.0F);
         this.tasks.addTask(1, this.sitAI);
         this.sitAI.setMutexBits(7);
-        this.tasks.addTask(2, new EntityAIFollowEntity(this, EntityGolem.class, 1.0, 4.0F, 32.0F));
+        this.followAI = new EntityAIFollowEntity(this, EntityGolem.class, 1.0, 4.0F, 32.0F);
+        this.tasks.addTask(2, this.followAI);
         this.tasks.addTask(3, new toast.utilityMobs.ai.EntityAIGolemWander(this, 1.0));
         this.tasks.addTask(4, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));
         this.tasks.addTask(4, new EntityAILookIdle(this));
@@ -70,7 +79,10 @@ public class EntityMelonGolem extends EntityStackGolem
     public void onLivingUpdate() {
         if (!this.world.isRemote && this.golemAttackTime <= 0) {
             this.golemAttackTime = 80;
-            float healRange = 16.0F;
+            float healRange = EntityMelonGolem.healRange;
+            // Park no farther than we can heal from (default 4 keeps prior behavior at heal range >= 4); at
+            // small heal ranges this lets the golem walk right up so it can actually reach and heal.
+            this.followAI.setRangeMin(Math.min(4.0F, healRange));
             List<EntityGolem> nearbyGolems = this.world.getEntitiesWithinAABB(EntityGolem.class, this.getEntityBoundingBox().grow(healRange, healRange, healRange));
             for (EntityGolem golem : nearbyGolems) {
                 if (!(golem instanceof EntityMelonGolem) && golem.getHealth() < golem.getMaxHealth() && this.getDistanceSq(golem) <= healRange * healRange) {

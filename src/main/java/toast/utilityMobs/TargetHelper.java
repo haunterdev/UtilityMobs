@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 
 import net.minecraft.entity.Entity;
@@ -61,6 +62,18 @@ public class TargetHelper
     // targeted by any golem/turret, regardless of owner target books or the attack_* toggles. Shared by
     // all target helpers; rebuilt from config on every Properties.load() (init + in-game config save).
     private static final HashSet<Class> GLOBAL_BLACKLIST = new HashSet<Class>();
+    // Registry-id form of the global blacklist. An entry is matched against an entity's OWN registry key at
+    // check time, so a modded id (e.g. lycanitesmobs:cinder) still blocks even when its class could not be
+    // resolved at load time because that mod registered its entities after us (mod load order). This is the
+    // fix for "modded entities added to attack_blacklist are ignored while vanilla works": vanilla classes
+    // always resolve at our preInit, modded ones may not - id matching is order-independent.
+    private static final HashSet<String> GLOBAL_BLACKLIST_IDS = new HashSet<String>();
+    // Global, config-driven attack WHITELIST (general.attack_whitelist). Entity types here are ALWAYS valid
+    // targets even when the matching attack_* category toggle is off (e.g. target one passive/modded mob
+    // without enabling all passives). The blacklist and owner/friendly checks still take precedence. Same
+    // class + registry-id dual matching as the blacklist above.
+    private static final HashSet<Class> GLOBAL_WHITELIST = new HashSet<Class>();
+    private static final HashSet<String> GLOBAL_WHITELIST_IDS = new HashSet<String>();
     // Mob class whitelist for this target helper.
     private ArrayList<Class> mobWhitelist = new ArrayList<Class>();
     // Memoizes isWhitelisted() results per concrete entity Class. isWhitelisted loops the whitelist
@@ -68,6 +81,59 @@ public class TargetHelper
     // path. The set of entity classes in a world is tiny and bounded, so this caches to O(1) after
     // first sight. Cleared whenever the whitelist changes (whitelist/unwhitelist/load).
     private final HashMap<Class, Boolean> whitelistCache = new HashMap<Class, Boolean>();
+
+    // Per-class cache of a mod's reflective boolean isHostile() method (Optional-style: absent key = not
+    // looked up yet, mapped-to-null = looked up, no such method). Lets us detect modded hostiles (e.g.
+    // Lycanites) that track hostility on their own base class instead of implementing vanilla IMob, without
+    // paying the reflection lookup on every target scan. The result is NOT cached (isHostile() can change at
+    // runtime, e.g. a tamed creature), only the Method handle.
+    private static final HashMap<Class, java.lang.reflect.Method> HOSTILE_METHOD_CACHE = new HashMap<Class, java.lang.reflect.Method>();
+
+    /** Broad "is this a hostile mob" test used by the target-category gate so modded hostiles are attacked
+        out of the box, not just vanilla IMob. Matches, in order: vanilla IMob; anything whose creature type
+        is MONSTER (mods that override isCreatureType); and a reflective no-arg boolean isHostile() returning
+        true (covers Lycanites Mobs and similar frameworks that don't implement IMob). */
+    public static boolean isHostileMob(Entity entity) {
+        if (entity instanceof IMob)
+            return true;
+        if (entity instanceof net.minecraft.entity.EntityLiving
+                && ((net.minecraft.entity.EntityLiving) entity).isCreatureType(net.minecraft.entity.EnumCreatureType.MONSTER, false))
+            return true;
+        Boolean reflective = TargetHelper.reflectiveIsHostile(entity);
+        return reflective != null && reflective.booleanValue();
+    }
+
+    // Invokes a cached, reflectively-found no-arg boolean isHostile() on the entity, or null if the class
+    // has no such method (or the call fails). Method handle is resolved once per class and cached.
+    private static Boolean reflectiveIsHostile(Entity entity) {
+        Class entityClass = entity.getClass();
+        java.lang.reflect.Method method;
+        if (HOSTILE_METHOD_CACHE.containsKey(entityClass)) {
+            method = HOSTILE_METHOD_CACHE.get(entityClass);
+        }
+        else {
+            method = null;
+            try {
+                java.lang.reflect.Method m = entityClass.getMethod("isHostile");
+                if (m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class) {
+                    m.setAccessible(true);
+                    method = m;
+                }
+            }
+            catch (Throwable ex) {
+                // No isHostile() on this class (the common vanilla case) - cache the miss.
+            }
+            HOSTILE_METHOD_CACHE.put(entityClass, method);
+        }
+        if (method == null)
+            return null;
+        try {
+            return (Boolean) method.invoke(entity);
+        }
+        catch (Throwable ex) {
+            return null;
+        }
+    }
 
     /** Fixed set of vanilla "neutral" mobs (don't attack unprovoked). Used by the hostile/
         neutral/passive target gate so players can choose to leave these alone. */
@@ -193,7 +259,7 @@ public class TargetHelper
     public boolean isValidTarget(Entity entity) {
         if (!this.maintainTarget(entity))
             return false;
-        if (TargetHelper.isGloballyBlacklisted(entity.getClass()))
+        if (TargetHelper.isGloballyBlacklisted(entity))
             return false;
         if (this.owner == null)
             return entity instanceof EntityUtilityGolem ? ((IEntityOwnable)entity).getOwner() != null : true;
@@ -205,9 +271,14 @@ public class TargetHelper
         if (entity instanceof EntityPlayer)
             return this.canDamagePlayer(entity.getName());
         Class entityClass = entity.getClass();
-        if (!this.isBlacklisted(entityClass) && this.isWhitelisted(entityClass))
+        // The per-player blacklist (target book "!entity") always wins - the owner explicitly said no.
+        if (this.isBlacklisted(entityClass))
+            return false;
+        // The global attack whitelist forces the target through the per-player whitelist requirement; the
+        // category gate (passive/neutral) is bypassed separately in EntityUtilityGolem.canAttackNoSight.
+        if (TargetHelper.isGloballyWhitelisted(entity))
             return true;
-        return false;
+        return this.isWhitelisted(entityClass);
     }
 
     // Marks this target helper for deletion. Called every now-and-then on every target helper. They will reload themselves if still being used.
@@ -901,29 +972,64 @@ public class TargetHelper
     // class name. Unresolvable entries are skipped (a modded id may not resolve until that mod has loaded;
     // the list is rebuilt on the next reload). Called from Properties.load().
     public static void loadGlobalBlacklist(String[] names) {
-        TargetHelper.GLOBAL_BLACKLIST.clear();
+        TargetHelper.loadGlobalList(names, TargetHelper.GLOBAL_BLACKLIST, TargetHelper.GLOBAL_BLACKLIST_IDS, "attack_blacklist");
+    }
+
+    // Rebuilds the global attack whitelist from general.attack_whitelist. Same entry syntax as the blacklist.
+    public static void loadGlobalWhitelist(String[] names) {
+        TargetHelper.loadGlobalList(names, TargetHelper.GLOBAL_WHITELIST, TargetHelper.GLOBAL_WHITELIST_IDS, "attack_whitelist");
+    }
+
+    // Shared parser for both global lists. Resolves each entry to a class when possible (keeps subclass
+    // coverage) AND remembers the registry-id form for any namespaced entry, so a modded id still matches by
+    // the entity's own key even if its class can't be resolved at this lifecycle stage (mod load order).
+    private static void loadGlobalList(String[] names, HashSet<Class> classes, HashSet<String> ids, String label) {
+        classes.clear();
+        ids.clear();
         if (names == null)
             return;
-        for (String name : names) {
-            if (name == null || name.trim().isEmpty())
+        for (String raw : names) {
+            if (raw == null || raw.trim().isEmpty())
                 continue;
-            Class entry = TargetHelper.stringToClass(name.trim());
+            String name = raw.trim();
+            Class entry = TargetHelper.stringToClass(name);
             if (entry != null) {
-                TargetHelper.GLOBAL_BLACKLIST.add(entry);
+                classes.add(entry);
             }
-            else {
-                _UtilityMobs.console("attack_blacklist: could not resolve entity '" + name.trim() + "' (skipped).");
+            if (name.indexOf(':') >= 0) {
+                // Registry id (has a namespace) - remember it verbatim for order-independent key matching.
+                ids.add(name.toLowerCase(Locale.ROOT));
+            }
+            else if (entry == null && !"Player".equals(name) && !"Hostiles".equals(name)) {
+                _UtilityMobs.console(label + ": could not resolve entity '" + name + "' (skipped).");
             }
         }
     }
 
-    // True if the entity class is covered by the global attack blacklist (matches the class or any
-    // superclass/interface entry, so blacklisting a base type also covers its subclasses).
-    public static boolean isGloballyBlacklisted(Class entityClass) {
-        if (TargetHelper.GLOBAL_BLACKLIST.isEmpty())
+    // True if the entity is covered by the global attack blacklist.
+    public static boolean isGloballyBlacklisted(Entity entity) {
+        return TargetHelper.matchesGlobalList(entity, TargetHelper.GLOBAL_BLACKLIST, TargetHelper.GLOBAL_BLACKLIST_IDS);
+    }
+
+    // True if the entity is covered by the global attack whitelist.
+    public static boolean isGloballyWhitelisted(Entity entity) {
+        return TargetHelper.matchesGlobalList(entity, TargetHelper.GLOBAL_WHITELIST, TargetHelper.GLOBAL_WHITELIST_IDS);
+    }
+
+    // Matches an entity against a global list by class (covers subclasses of a resolved entry) OR by its own
+    // registry id (covers modded entries whose class never resolved). Order-independent, so it is robust to
+    // mod load order - the root cause of modded ids being silently ignored before.
+    private static boolean matchesGlobalList(Entity entity, HashSet<Class> classes, HashSet<String> ids) {
+        if (classes.isEmpty() && ids.isEmpty())
             return false;
-        for (Class blocked : TargetHelper.GLOBAL_BLACKLIST) {
-            if (blocked.isAssignableFrom(entityClass))
+        Class entityClass = entity.getClass();
+        for (Class listed : classes) {
+            if (listed.isAssignableFrom(entityClass))
+                return true;
+        }
+        if (!ids.isEmpty()) {
+            ResourceLocation key = EntityList.getKey(entity);
+            if (key != null && ids.contains(key.toString().toLowerCase(Locale.ROOT)))
                 return true;
         }
         return false;

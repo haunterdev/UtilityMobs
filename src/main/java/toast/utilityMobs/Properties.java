@@ -61,6 +61,12 @@ public abstract class Properties
             "Entity types that golems and turrets will NEVER attack, regardless of owner target books or the attack_* toggles. One entry per line: an entity registry id (e.g. minecraft:cow, minecraft:villager), the tokens Player or Hostiles, or a fully-qualified class name. Blacklisting a base class also covers its subclasses. Lets you protect animals/NPCs the in-game target book cannot add.");
         attackBlacklist.setLanguageKey("utilitymobs.cfg.general.attack_blacklist");
         TargetHelper.loadGlobalBlacklist(attackBlacklist.getStringList());
+        // Global attack whitelist: entity types golems/turrets ALWAYS attack, even with the matching
+        // attack_* category toggle off. Blacklist and owner/friendly checks still take precedence.
+        Property attackWhitelist = config.get(Properties.GENERAL, "attack_whitelist", new String[0],
+            "Entity types that golems and turrets will ALWAYS attack, even when the matching attack_* category toggle is off (e.g. target one specific passive animal or modded mob without enabling all passives). One entry per line: an entity registry id (e.g. minecraft:cow), the tokens Player or Hostiles, or a fully-qualified class name. The attack_blacklist and owner/friendly protections still take precedence over this list.");
+        attackWhitelist.setLanguageKey("utilitymobs.cfg.general.attack_whitelist");
+        TargetHelper.loadGlobalWhitelist(attackWhitelist.getStringList());
 
         // ---- Turrets (behavior) ----
         prop = Properties.add(config, "turrets", "require_ammo", false, "If true, turrets must hold matching ammo in their 9-slot ammo inventory to fire (arrow turrets need arrows, fireball/ghast need fire charges, snow needs snowballs). Adds an ammo panel to the turret GUI.");
@@ -83,6 +89,8 @@ public abstract class Properties
         prop.setLanguageKey("utilitymobs.cfg.golems.attack_passives");
         prop = Properties.add(config, "golems", "attack_neutrals", false, "If true, worker golems and colossal golems may target neutral mobs (endermen, zombie pigmen, spiders, wolves, polar bears, llamas, iron golems).");
         prop.setLanguageKey("utilitymobs.cfg.golems.attack_neutrals");
+        prop = Properties.add(config, "golems", "melon_heal_range", 16.0, "How close (in blocks) a melon golem must be to another golem before it heals it. Lower = the melon golem has to come nearer, which is more balanced than healing anything it can see from afar.");
+        prop.setLanguageKey("utilitymobs.cfg.golems.melon_heal_range").setMinValue(1.0).setMaxValue(64.0);
 
         // Performance tuning for large golem armies. See UMProfiler / EntityAIGolemTarget / EntityUtilityGolem.
         prop = Properties.add(config, "golems", "performance_logging", false, "If true, logs golem AI and collision timing stats to the server console every 10s. Diagnostic only - leave off in normal play.");
@@ -170,6 +178,7 @@ public abstract class Properties
         toast.utilityMobs.ai.EntityAIGolemFollow.teleportBudget = Math.max(1, Properties.getInt("golems", "follow_teleports_per_tick"));
         toast.utilityMobs.ai.EntityAIGolemWander.budget = Math.max(1, Properties.getInt("golems", "wander_budget"));
         toast.utilityMobs.colossal.EntityColossalGolem.wanderWhileRidden = Properties.getBoolean("colossals", "wander_while_ridden");
+        toast.utilityMobs.golem.EntityMelonGolem.healRange = (float)Properties.getDouble("golems", "melon_heal_range");
     }
 
     // Re-reads config values into the map (called after the in-game config GUI saves changes).

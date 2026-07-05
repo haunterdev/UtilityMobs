@@ -153,7 +153,10 @@ public class EntitySteamGolem extends EntityLargeGolem implements IInventory
 
     @Override
     public String getName() {
-        return this.hasCustomName() ? this.getCustomNameTag() : "Steam Golem";
+        // Return the entity's lang KEY (not a literal) when unnamed, so the GUI title - drawn via
+        // I18n.format(getName()) - is localizable and follows resource-pack/lang overrides. Reuses the
+        // existing entity name key so there is one source of truth for the display name.
+        return this.hasCustomName() ? this.getCustomNameTag() : "entity.SteamGolem.name";
     }
 
     // NOTE: do NOT override hasCustomName() to always-true. It is shared with Entity, and forcing
@@ -242,7 +245,35 @@ public class EntitySteamGolem extends EntityLargeGolem implements IInventory
         super.onUpdate();
         if (this.world.isRemote) {
             this.texture = this.getBurningState() ? EntitySteamGolem.TEXTURES[1] : EntitySteamGolem.TEXTURES[0];
+            if (this.getBurningState()) {
+                this.spawnFurnaceFX();
+            }
         }
+    }
+
+    /// Emits the lit-furnace fire crackle + flame/smoke particles from the golem's furnace face while
+    /// powered (issue #8). Mirrors vanilla BlockFurnace.randomDisplayTick exactly - one flame + one smoke
+    /// per tick and a 10% chance of the crackle sound - so the rate and volume match a real lit furnace.
+    /// Called only from the client branch of onUpdate; every API used here is common-side (no-ops server).
+    private void spawnFurnaceFX() {
+        float yaw = this.renderYawOffset * ((float) Math.PI / 180.0F);
+        double forwardX = -net.minecraft.util.math.MathHelper.sin(yaw);
+        double forwardZ = net.minecraft.util.math.MathHelper.cos(yaw);
+        // Chest/furnace face: half the body height up, pushed out to the front of the model.
+        double faceX = this.posX + forwardX * 0.55D;
+        double faceY = this.posY + this.height * 0.5D;
+        double faceZ = this.posZ + forwardZ * 0.55D;
+        // Spread sideways across the face (perpendicular to facing) and a little vertically.
+        double side = (this.rand.nextDouble() - 0.5D) * 0.6D;
+        double px = faceX + forwardZ * side;
+        double pz = faceZ - forwardX * side;
+        double py = faceY + (this.rand.nextDouble() - 0.3D) * 0.4D;
+        if (this.rand.nextDouble() < 0.1D) {
+            this.world.playSound(this.posX, this.posY, this.posZ, net.minecraft.init.SoundEvents.BLOCK_FURNACE_FIRE_CRACKLE,
+                net.minecraft.util.SoundCategory.BLOCKS, 1.0F, 1.0F, false);
+        }
+        this.world.spawnParticle(net.minecraft.util.EnumParticleTypes.SMOKE_NORMAL, px, py, pz, 0.0D, 0.0D, 0.0D);
+        this.world.spawnParticle(net.minecraft.util.EnumParticleTypes.FLAME, px, py, pz, 0.0D, 0.0D, 0.0D);
     }
 
     /// Called each tick this entity is alive.
@@ -276,6 +307,17 @@ public class EntitySteamGolem extends EntityLargeGolem implements IInventory
                 this.setBurningState(burnState);
             }
             this.sitAI.sit = !burnState;
+
+            // Auto-close the GUI for any viewer who has walked too far away (mirrors vanilla horse/llama
+            // inventories, which close past ~8 blocks). Without this the menu could stay open on a golem
+            // that wandered off (issue #6).
+            for (net.minecraft.entity.player.EntityPlayer viewer : this.world.playerEntities) {
+                if (viewer.openContainer instanceof ContainerSteamGolem
+                        && ((ContainerSteamGolem)viewer.openContainer).getGolem() == this
+                        && (!this.isEntityAlive() || this.getDistanceSq(viewer) > 64.0D)) {
+                    viewer.closeScreen();
+                }
+            }
         }
         super.onLivingUpdate();
     }

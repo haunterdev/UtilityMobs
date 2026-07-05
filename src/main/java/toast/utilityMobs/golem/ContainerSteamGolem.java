@@ -40,6 +40,11 @@ public class ContainerSteamGolem extends Container
         }
     }
 
+    /// The golem this container is viewing. Used by the golem's tick to auto-close distant viewers.
+    public EntitySteamGolem getGolem() {
+        return this.golem;
+    }
+
     /// Callback for when the crafting gui is closed.
     @Override
     public void onContainerClosed(EntityPlayer player) {

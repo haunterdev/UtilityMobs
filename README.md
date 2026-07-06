@@ -13,6 +13,8 @@ balance and performance adjustments.
 
 ## Features
 
+- **NOTE : Current feature list is missing some things from more recent versions, will be updated when update frequency lowers.**
+
 - **Combat golems.** Iron, armor, gilded, stone, obsidian, scarecrow, bound soul, steam, and melon golems that roam and hunt hostiles, aimed with a Target Book.
 - **Block golems.** Chest, trapped chest, ender chest, furnace, anvil, jukebox, workbench, and jack o'lantern golems - portable, sittable utility mobs that store, smelt, craft, and light.
 - **Turrets.** Arrow, fire, fireball, ghast, snow, brick, stone, shotgun, sniper, gatling, volley, killer, and obsidian turrets, each with its own range, damage, and projectile profile and a slot for upgrades.

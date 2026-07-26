@@ -8,10 +8,8 @@
 
 A 1.20.1 Forge port of [Utility Mobs: Redux](https://github.com/haunterdev/UtilityMobs/tree/1.12.2),
 which is itself a port and extension of [FatherToast's Utility Mobs](https://www.curseforge.com/minecraft/mc-mods/utility-mobs).
-Ported line for line from the 1.12.2 release, so behavior, stats, config option names, and recipes
-all match. Where 1.20.1 forced a change, the code says so.
 
-Looking for the 1.12.2 version? It lives on the [`1.12.2` branch](https://github.com/haunterdev/UtilityMobs/tree/1.12.2).
+Looking for the 1.12.2 version? It here -> [`1.12.2` branch](https://github.com/haunterdev/UtilityMobs/tree/1.12.2).
 
 ## Features
 
@@ -33,7 +31,7 @@ Looking for the 1.12.2 version? It lives on the [`1.12.2` branch](https://github
 
 - Minecraft 1.20.1
 - Minecraft Forge 47.0.0 or newer
-- [Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli) (optional; without it the mod runs fine and the guide book is simply absent)
+- [Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli) (optional)
 
 ## Installation
 
@@ -47,7 +45,7 @@ Looking for the 1.12.2 version? It lives on the [`1.12.2` branch](https://github
 ./gradlew build
 ```
 
-The built jar lands in `build/libs/`. Patchouli is pulled from the BlameJared maven at compile time,
+The built jar ends up in `build/libs/`. Patchouli is pulled from the BlameJared maven at compile time,
 so no jar needs to be vendored.
 
 ## Credits

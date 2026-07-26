@@ -11,6 +11,9 @@ originally written for Minecraft 1.7.10. Everything from the original is present
 in-game guide book, a full config GUI, right-click healing, a batch-spawn command, and a pile of
 balance and performance adjustments.
 
+This is the `1.12.2` branch. The [`master` branch](https://github.com/haunterdev/UtilityMobs/tree/master)
+holds the Forge 1.20.1 port.
+
 ## Features
 
 - **NOTE : Current feature list is missing some things from more recent versions, will be updated when update frequency lowers.**

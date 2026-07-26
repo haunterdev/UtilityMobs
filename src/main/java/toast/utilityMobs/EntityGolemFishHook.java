@@ -1,21 +1,36 @@
 package toast.utilityMobs;
 
 import java.util.List;
+import java.util.Optional;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.state.IBlockState;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.network.play.server.SPacketEntityVelocity;
-import net.minecraft.util.math.AxisAlignedBB;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.RayTraceResult;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.network.NetworkHooks;
 import toast.utilityMobs.golem.EntityUtilityGolem;
+import toast.utilityMobs.setup.ModEntities;
 
+/**
+ * The fishing-rod hook a golem casts at its target to yank it closer. Hand-rolled projectile physics,
+ * kept as-is from 1.12.2 rather than rebased onto vanilla's FishingHook (which is player-bound).
+ */
 public class EntityGolemFishHook extends Entity
 {
     private BlockPos tilePos = new BlockPos(-1, -1, -1);
@@ -26,126 +41,133 @@ public class EntityGolemFishHook extends Entity
     private int ticksInGround = 0;
     private int ticksInAir = 0;
 
-    public EntityGolemFishHook(World world) {
-        super(world);
-        this.setSize(0.25F, 0.25F);
+    /// Registered entity size: 0.25 x 0.25 (set via EntityType.Builder.sized at registration).
+    public EntityGolemFishHook(EntityType<? extends EntityGolemFishHook> type, Level level) {
+        super(type, level);
     }
 
-    public EntityGolemFishHook(World world, EntityUtilityGolem golem, Entity target) {
-        super(world);
-        this.setSize(0.25F, 0.25F);
+    public EntityGolemFishHook(Level level, EntityUtilityGolem golem, Entity target) {
+        super(ModEntities.GOLEM_FISH_HOOK.get(), level);
         this.angler = golem;
-        this.setLocationAndAngles(golem.posX, golem.posY + golem.getEyeHeight(), golem.posZ, golem.rotationYaw, golem.rotationPitch);
-        this.posX -= MathHelper.cos(this.rotationYaw / 180.0F * (float)Math.PI) * 0.16F;
-        this.posY -= 0.1;
-        this.posZ -= MathHelper.sin(this.rotationYaw / 180.0F * (float)Math.PI) * 0.16F;
-        this.setPosition(this.posX, this.posY, this.posZ);
-        this.motionX = (target.posX - golem.posX) * 0.7;
-        this.motionY = (target.posY + target.getEyeHeight() - 0.7 - this.posY) * 0.7;
-        this.motionZ = (target.posZ - golem.posZ) * 0.7;
-        double vH = MathHelper.sqrt(this.motionX * this.motionX + this.motionZ * this.motionZ);
+        this.moveTo(golem.getX(), golem.getY() + golem.getEyeHeight(), golem.getZ(), golem.getYRot(), golem.getXRot());
+        double x = this.getX() - Mth.cos(this.getYRot() / 180.0F * (float)Math.PI) * 0.16F;
+        double y = this.getY() - 0.1;
+        double z = this.getZ() - Mth.sin(this.getYRot() / 180.0F * (float)Math.PI) * 0.16F;
+        this.setPos(x, y, z);
+        double mX = (target.getX() - golem.getX()) * 0.7;
+        double mY = (target.getY() + target.getEyeHeight() - 0.7 - this.getY()) * 0.7;
+        double mZ = (target.getZ() - golem.getZ()) * 0.7;
+        this.setDeltaMovement(mX, mY, mZ);
+        double vH = Math.sqrt(mX * mX + mZ * mZ);
         if (vH >= 1E-7) {
-            this.rotationYaw = (float)(Math.atan2(this.motionZ, this.motionX) * 180.0 / Math.PI) - 90.0F;
-            this.rotationPitch = (float)(-Math.atan2(this.motionY, vH) * 180.0 / Math.PI);
-            double dX = this.motionX / vH;
-            double dZ = this.motionZ / vH;
-            this.setLocationAndAngles(golem.posX + dX, this.posY, golem.posZ + dZ, this.rotationYaw, this.rotationPitch);
-            this.calculateVelocity(this.motionX, this.motionY + vH * 0.2, this.motionZ, 1.0F, 14 - (this.world.getDifficulty().getId() << 2));
+            this.setYRot((float)(Math.atan2(mZ, mX) * 180.0 / Math.PI) - 90.0F);
+            this.setXRot((float)(-Math.atan2(mY, vH) * 180.0 / Math.PI));
+            double dX = mX / vH;
+            double dZ = mZ / vH;
+            this.moveTo(golem.getX() + dX, this.getY(), golem.getZ() + dZ, this.getYRot(), this.getXRot());
+            this.calculateVelocity(mX, mY + vH * 0.2, mZ, 1.0F, 14 - (this.level().getDifficulty().getId() << 2));
         }
     }
 
     @Override
-    protected void entityInit() {
+    protected void defineSynchedData() {
     }
 
     @Override
-    public boolean isInRangeToRenderDist(double d) {
-        double d1 = this.getEntityBoundingBox().getAverageEdgeLength() * 256.0;
+    public boolean shouldRenderAtSqrDistance(double d) {
+        double d1 = this.getBoundingBox().getSize() * 256.0;
         return d < d1 * d1;
     }
 
     public void calculateVelocity(double vX, double vY, double vZ, float v, float variance) {
-        float vi = MathHelper.sqrt(vX * vX + vY * vY + vZ * vZ);
+        double vi = Math.sqrt(vX * vX + vY * vY + vZ * vZ);
         vX /= vi;
         vY /= vi;
         vZ /= vi;
-        vX += this.rand.nextGaussian() * 0.0075 * variance;
-        vY += this.rand.nextGaussian() * 0.0075 * variance;
-        vZ += this.rand.nextGaussian() * 0.0075 * variance;
+        vX += this.random.nextGaussian() * 0.0075 * variance;
+        vY += this.random.nextGaussian() * 0.0075 * variance;
+        vZ += this.random.nextGaussian() * 0.0075 * variance;
         vX *= v;
         vY *= v;
         vZ *= v;
-        this.motionX = vX;
-        this.motionY = vY;
-        this.motionZ = vZ;
-        float vH = MathHelper.sqrt(vX * vX + vZ * vZ);
-        this.prevRotationYaw = this.rotationYaw = (float)(Math.atan2(vX, vZ) * 180.0 / Math.PI);
-        this.prevRotationPitch = this.rotationPitch = (float)(Math.atan2(vY, vH) * 180.0 / Math.PI);
+        this.setDeltaMovement(vX, vY, vZ);
+        double vH = Math.sqrt(vX * vX + vZ * vZ);
+        this.setYRot((float)(Math.atan2(vX, vZ) * 180.0 / Math.PI));
+        this.yRotO = this.getYRot();
+        this.setXRot((float)(Math.atan2(vY, vH) * 180.0 / Math.PI));
+        this.xRotO = this.getXRot();
         this.ticksInGround = 0;
     }
 
     @Override
-    public void setVelocity(double vX, double vY, double vZ) {
-        this.motionX = vX;
-        this.motionY = vY;
-        this.motionZ = vZ;
-        if (this.prevRotationPitch == 0.0F && this.prevRotationYaw == 0.0F) {
-            float vH = MathHelper.sqrt(vX * vX + vZ * vZ);
-            this.prevRotationYaw = this.rotationYaw = (float)(Math.atan2(vX, vZ) * 180.0 / Math.PI);
-            this.prevRotationPitch = this.rotationPitch = (float)(Math.atan2(vY, vH) * 180.0 / Math.PI);
+    public void lerpMotion(double vX, double vY, double vZ) {
+        this.setDeltaMovement(vX, vY, vZ);
+        if (this.xRotO == 0.0F && this.yRotO == 0.0F) {
+            double vH = Math.sqrt(vX * vX + vZ * vZ);
+            this.setYRot((float)(Math.atan2(vX, vZ) * 180.0 / Math.PI));
+            this.yRotO = this.getYRot();
+            this.setXRot((float)(Math.atan2(vY, vH) * 180.0 / Math.PI));
+            this.xRotO = this.getXRot();
         }
     }
 
     @Override
-    public void onUpdate() {
-        this.lastTickPosX = this.posX;
-        this.lastTickPosY = this.posY;
-        this.lastTickPosZ = this.posZ;
-        super.onUpdate();
-        if (this.angler == null || this.angler.isDead || this.getDistanceSq(this.angler) > 1024.0) {
-            this.setDead();
+    public void tick() {
+        this.xOld = this.getX();
+        this.yOld = this.getY();
+        this.zOld = this.getZ();
+        super.tick();
+        if (this.angler == null || !this.angler.isAlive() || this.distanceToSqr(this.angler) > 1024.0) {
+            this.discard();
+            return;
         }
         if (this.shake > 0) {
             this.shake--;
         }
         if (this.inGround) {
-            Block inBlock = this.world.getBlockState(this.tilePos).getBlock();
+            Block inBlock = this.level().getBlockState(this.tilePos).getBlock();
             if (inBlock == this.inTile) {
                 this.ticksInGround++;
                 if (this.ticksInGround == 1200) {
-                    this.setDead();
+                    this.discard();
                 }
                 return;
             }
             this.inGround = false;
-            this.motionX *= this.rand.nextFloat() * 0.2F;
-            this.motionY *= this.rand.nextFloat() * 0.2F;
-            this.motionZ *= this.rand.nextFloat() * 0.2F;
+            Vec3 motion = this.getDeltaMovement();
+            this.setDeltaMovement(
+                motion.x * this.random.nextFloat() * 0.2F,
+                motion.y * this.random.nextFloat() * 0.2F,
+                motion.z * this.random.nextFloat() * 0.2F);
             this.ticksInGround = 0;
             this.ticksInAir = 0;
         }
         else {
             this.ticksInAir++;
         }
-        Vec3d posVec = new Vec3d(this.posX, this.posY, this.posZ);
-        Vec3d motionVec = new Vec3d(this.posX + this.motionX, this.posY + this.motionY, this.posZ + this.motionZ);
-        RayTraceResult object = this.world.rayTraceBlocks(posVec, motionVec);
-        posVec = new Vec3d(this.posX, this.posY, this.posZ);
-        motionVec = new Vec3d(this.posX + this.motionX, this.posY + this.motionY, this.posZ + this.motionZ);
-        if (object != null) {
-            motionVec = new Vec3d(object.hitVec.x, object.hitVec.y, object.hitVec.z);
+
+        Vec3 motion = this.getDeltaMovement();
+        Vec3 posVec = new Vec3(this.getX(), this.getY(), this.getZ());
+        Vec3 motionVec = posVec.add(motion);
+        HitResult object = this.level().clip(new ClipContext(posVec, motionVec, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+        if (object.getType() != HitResult.Type.MISS) {
+            motionVec = object.getLocation();
         }
-        if (!this.world.isRemote) {
+        else {
+            object = null;
+        }
+
+        if (!this.level().isClientSide) {
             Entity entityHit = null;
-            List<Entity> entitiesInPath = this.world.getEntitiesWithinAABBExcludingEntity(this, this.getEntityBoundingBox().expand(this.motionX, this.motionY, this.motionZ).grow(1.0, 1.0, 1.0));
+            List<Entity> entitiesInPath = this.level().getEntities(this, this.getBoundingBox().expandTowards(motion).inflate(1.0, 1.0, 1.0));
             double d = Double.POSITIVE_INFINITY;
             for (int i = 0; i < entitiesInPath.size(); i++) {
                 Entity entityInPath = entitiesInPath.get(i);
-                if (entityInPath.canBeCollidedWith() && !entityInPath.isEntityEqual(this.angler)) {
-                    AxisAlignedBB aabb = entityInPath.getEntityBoundingBox().grow(0.3, 0.3, 0.3);
-                    RayTraceResult object1 = aabb.calculateIntercept(posVec, motionVec);
-                    if (object1 != null) {
-                        double d1 = posVec.distanceTo(object1.hitVec);
+                if (entityInPath.canBeCollidedWith() && !entityInPath.is(this.angler)) {
+                    AABB aabb = entityInPath.getBoundingBox().inflate(0.3, 0.3, 0.3);
+                    Optional<Vec3> object1 = aabb.clip(posVec, motionVec);
+                    if (object1.isPresent()) {
+                        double d1 = posVec.distanceTo(object1.get());
                         if (d1 < d) {
                             entityHit = entityInPath;
                             d = d1;
@@ -154,62 +176,54 @@ public class EntityGolemFishHook extends Entity
                 }
             }
             if (entityHit != null) {
-                object = new RayTraceResult(entityHit);
+                object = new EntityHitResult(entityHit);
             }
         }
         if (object != null) {
             this.onImpact(object);
         }
-        this.posX += this.motionX;
-        this.posY += this.motionY;
-        this.posZ += this.motionZ;
-        float var16 = MathHelper.sqrt(this.motionX * this.motionX + this.motionZ * this.motionZ);
-        this.rotationYaw = (float)(Math.atan2(this.motionX, this.motionZ) * 180.0 / Math.PI);
-        for (this.rotationPitch = (float)(Math.atan2(this.motionY, var16) * 180.0 / Math.PI); this.rotationPitch - this.prevRotationPitch < -180.0F; this.prevRotationPitch -= 360.0F) {
+
+        this.setPos(this.getX() + motion.x, this.getY() + motion.y, this.getZ() + motion.z);
+        float var16 = (float)Math.sqrt(motion.x * motion.x + motion.z * motion.z);
+        this.setYRot((float)(Math.atan2(motion.x, motion.z) * 180.0 / Math.PI));
+        for (this.setXRot((float)(Math.atan2(motion.y, var16) * 180.0 / Math.PI)); this.getXRot() - this.xRotO < -180.0F; this.xRotO -= 360.0F) {
             // Do nothing
         }
-        while (this.rotationPitch - this.prevRotationPitch >= 180.0F) {
-            this.prevRotationPitch += 360.0F;
+        while (this.getXRot() - this.xRotO >= 180.0F) {
+            this.xRotO += 360.0F;
         }
-        while (this.rotationYaw - this.prevRotationYaw < -180.0F) {
-            this.prevRotationYaw -= 360.0F;
+        while (this.getYRot() - this.yRotO < -180.0F) {
+            this.yRotO -= 360.0F;
         }
-        while (this.rotationYaw - this.prevRotationYaw >= 180.0F) {
-            this.prevRotationYaw += 360.0F;
+        while (this.getYRot() - this.yRotO >= 180.0F) {
+            this.yRotO += 360.0F;
         }
-        this.rotationPitch = this.prevRotationPitch + (this.rotationPitch - this.prevRotationPitch) * 0.2F;
-        this.rotationYaw = this.prevRotationYaw + (this.rotationYaw - this.prevRotationYaw) * 0.2F;
+        this.setXRot(this.xRotO + (this.getXRot() - this.xRotO) * 0.2F);
+        this.setYRot(this.yRotO + (this.getYRot() - this.yRotO) * 0.2F);
         if (this.isInWater()) {
-            this.setDead();
+            this.discard();
         }
-        this.motionX *= 0.99;
-        this.motionY *= 0.99;
-        this.motionZ *= 0.99;
-        this.motionY -= this.getGravityVelocity();
-        this.setPosition(this.posX, this.posY, this.posZ);
+        motion = this.getDeltaMovement();
+        this.setDeltaMovement(motion.x * 0.99, motion.y * 0.99 - this.getGravityVelocity(), motion.z * 0.99);
+        this.setPos(this.getX(), this.getY(), this.getZ());
     }
 
-    public void onImpact(RayTraceResult object) {
-        if (object.entityHit != null) {
-            double vX = this.angler.posX - this.posX;
-            double vY = this.angler.posY - this.posY;
-            double vZ = this.angler.posZ - this.posZ;
+    public void onImpact(HitResult object) {
+        if (object instanceof EntityHitResult hit) {
+            Entity entityHit = hit.getEntity();
+            double vX = this.angler.getX() - this.getX();
+            double vY = this.angler.getY() - this.getY();
+            double vZ = this.angler.getZ() - this.getZ();
             double v = Math.sqrt(vX * vX + vY * vY + vZ * vZ);
             double mult = 0.31;
-            object.entityHit.motionX = vX * mult;
-            object.entityHit.motionY = vY * mult + Math.sqrt(v) * 0.1;
-            object.entityHit.motionZ = vZ * mult;
-            object.entityHit.onGround = false;
-            if (object.entityHit instanceof EntityPlayerMP) {
-                try {
-                    ((EntityPlayerMP) object.entityHit).connection.sendPacket(new SPacketEntityVelocity(object.entityHit));
-                }
-                catch (Exception ex) {
-                    ex.printStackTrace();
-                }
+            entityHit.setDeltaMovement(vX * mult, vY * mult + Math.sqrt(v) * 0.1, vZ * mult);
+            entityHit.setOnGround(false);
+            if (entityHit instanceof ServerPlayer serverPlayer) {
+                // Players ignore server-side motion changes unless told explicitly.
+                serverPlayer.connection.send(new ClientboundSetEntityMotionPacket(entityHit));
             }
         }
-        this.setDead();
+        this.discard();
     }
 
     protected float getGravityVelocity() {
@@ -217,28 +231,35 @@ public class EntityGolemFishHook extends Entity
     }
 
     @Override
-    public void setDead() {
+    public void remove(RemovalReason reason) {
         if (this.angler != null) {
             this.angler.setFishingRod(true);
         }
-        super.setDead();
+        super.remove(reason);
     }
 
     @Override
-    public void writeEntityToNBT(NBTTagCompound tag) {
-        tag.setInteger("xTile", this.tilePos.getX());
-        tag.setInteger("yTile", this.tilePos.getY());
-        tag.setInteger("zTile", this.tilePos.getZ());
-        tag.setByte("inTile", (byte)Block.getIdFromBlock(this.inTile));
-        tag.setByte("shake", (byte)this.shake);
-        tag.setByte("inGround", (byte)(this.inGround ? 1 : 0));
+    public void addAdditionalSaveData(CompoundTag tag) {
+        tag.putInt("xTile", this.tilePos.getX());
+        tag.putInt("yTile", this.tilePos.getY());
+        tag.putInt("zTile", this.tilePos.getZ());
+        // 1.12.2 stored the block as a numeric id byte. Numeric block ids are gone in 1.20.1, so the
+        // registry name is stored instead.
+        tag.putString("inTile", BuiltInRegistries.BLOCK.getKey(this.inTile == null ? Blocks.AIR : this.inTile).toString());
+        tag.putByte("shake", (byte)this.shake);
+        tag.putBoolean("inGround", this.inGround);
     }
 
     @Override
-    public void readEntityFromNBT(NBTTagCompound tag) {
-        this.tilePos = new BlockPos(tag.getInteger("xTile"), tag.getInteger("yTile"), tag.getInteger("zTile"));
-        this.inTile = Block.getBlockById(tag.getByte("inTile") & 0xff);
+    public void readAdditionalSaveData(CompoundTag tag) {
+        this.tilePos = new BlockPos(tag.getInt("xTile"), tag.getInt("yTile"), tag.getInt("zTile"));
+        this.inTile = BuiltInRegistries.BLOCK.get(new ResourceLocation(tag.getString("inTile")));
         this.shake = tag.getByte("shake") & 0xff;
-        this.inGround = tag.getByte("inGround") == 1;
+        this.inGround = tag.getBoolean("inGround");
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getAddEntityPacket() {
+        return NetworkHooks.getEntitySpawningPacket(this);
     }
 }

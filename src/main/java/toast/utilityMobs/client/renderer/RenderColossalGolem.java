@@ -1,45 +1,42 @@
 package toast.utilityMobs.client.renderer;
 
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.entity.RenderLiving;
-import net.minecraft.client.renderer.entity.RenderManager;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.MobRenderer;
+import net.minecraft.resources.ResourceLocation;
+import toast.utilityMobs.client.ClientSetup;
 import toast.utilityMobs.client.model.ModelColossalGolem;
-import toast.utilityMobs.golem.EntityUtilityGolem;
+import toast.utilityMobs.colossal.EntityColossalGolem;
 
-@SideOnly(Side.CLIENT)
-public class RenderColossalGolem extends RenderLiving<EntityUtilityGolem>
+public class RenderColossalGolem extends MobRenderer<EntityColossalGolem, ModelColossalGolem>
 {
-    public RenderColossalGolem(RenderManager renderManager) {
-        super(renderManager, new ModelColossalGolem(), 1.0F);
+    public RenderColossalGolem(EntityRendererProvider.Context ctx) {
+        super(ctx, new ModelColossalGolem(ctx.bakeLayer(ClientSetup.COLOSSAL_GOLEM_LAYER)), 1.0F);
     }
 
     @Override
-    protected ResourceLocation getEntityTexture(EntityUtilityGolem entity) {
+    public ResourceLocation getTextureLocation(EntityColossalGolem entity) {
         return entity.getTexture();
     }
 
+    /// 1.12.2 preRenderCallback: the colossus is rendered at 1.35x its model size.
     @Override
-    protected void preRenderCallback(EntityUtilityGolem entity, float partialTick) {
-        super.preRenderCallback(entity, partialTick);
-        GlStateManager.scale(1.35F, 1.35F, 1.35F);
+    protected void scale(EntityColossalGolem entity, PoseStack poseStack, float partialTick) {
+        poseStack.scale(1.35F, 1.35F, 1.35F);
     }
 
+    /// The lumbering side-to-side sway while walking, suppressed while it is being ridden (as in 1.12.2).
     @Override
-    protected void renderLeash(EntityUtilityGolem entity, double x, double y, double z, float entityYaw, float partialTicks) {
-        super.renderLeash(entity, x, y - 0.8D, z, entityYaw, partialTicks);
-    }
-
-    @Override
-    protected void applyRotations(EntityUtilityGolem entity, float ageInTicks, float rotationYaw, float partialTicks) {
-        super.applyRotations(entity, ageInTicks, rotationYaw, partialTicks);
-        if (entity.limbSwingAmount >= 0.01 && !entity.isBeingRidden()) {
-            float f3 = 13.0F;
-            float f4 = entity.limbSwing - entity.limbSwingAmount * (1.0F - partialTicks) + 6.0F;
-            float f5 = (Math.abs(f4 % f3 - f3 * 0.5F) - f3 * 0.25F) / (f3 * 0.25F);
-            GlStateManager.rotate(6.5F * f5, 0.0F, 0.0F, 1.0F);
+    protected void setupRotations(EntityColossalGolem entity, PoseStack poseStack, float ageInTicks, float rotationYaw, float partialTicks) {
+        super.setupRotations(entity, poseStack, ageInTicks, rotationYaw, partialTicks);
+        if (entity.walkAnimation.speed() >= 0.01F && !entity.isVehicle()) {
+            float period = 13.0F;
+            float pos = entity.walkAnimation.position() - entity.walkAnimation.speed() * (1.0F - partialTicks) + 6.0F;
+            float sway = (Math.abs(pos % period - period * 0.5F) - period * 0.25F) / (period * 0.25F);
+            poseStack.mulPose(Axis.ZP.rotationDegrees(6.5F * sway));
         }
+        // 1.12.2 also lowered the leash anchor 0.8 blocks (renderLeash override). Cosmetic; the vanilla
+        // leash anchor is used here.
     }
 }

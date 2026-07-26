@@ -3,76 +3,34 @@ package toast.utilityMobs;
 import java.io.File;
 import java.util.Random;
 
-import net.minecraft.block.Block;
-import net.minecraft.entity.Entity;
-import net.minecraft.init.Blocks;
-import net.minecraft.init.Items;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.crafting.IRecipe;
-import net.minecraft.item.crafting.Ingredient;
-import net.minecraft.item.crafting.ShapelessRecipes;
-import net.minecraft.util.NonNullList;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.common.config.Configuration;
-import net.minecraftforge.event.RegistryEvent;
-import net.minecraftforge.oredict.ShapedOreRecipe;
-import net.minecraftforge.registries.IForgeRegistry;
-import toast.utilityMobs.block.BlockGolemLight;
-import toast.utilityMobs.golem.EntityUMIronGolem;
-import toast.utilityMobs.golem.EntityUMSnowGolem;
-import toast.utilityMobs.golem.EntityUtilityGolem;
-import toast.utilityMobs.network.GuiHelper;
-import toast.utilityMobs.network.MessageExplosion;
-import toast.utilityMobs.network.MessageFetchTargetHelper;
-import toast.utilityMobs.network.MessageHealNumber;
-import toast.utilityMobs.network.MessageTargetHelper;
-import toast.utilityMobs.network.MessageTurretToggle;
-import toast.utilityMobs.network.MessageUseGolem;
-import toast.utilityMobs.turret.EntityTurretArrow;
-import net.minecraftforge.fml.common.FMLCommonHandler;
+import net.minecraftforge.common.ForgeConfigSpec;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.SidedProxy;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.network.NetworkRegistry;
-import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
-import net.minecraftforge.fml.common.registry.EntityRegistry;
-import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.loading.FMLPaths;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import toast.utilityMobs.setup.ModEntities;
+import toast.utilityMobs.setup.ModRegistries;
 
-@Mod(modid = _UtilityMobs.MODID, name = "Utility Mobs", version = _UtilityMobs.VERSION, guiFactory = "toast.utilityMobs.client.GuiFactory", dependencies = "required-after:patchouli")
-public class _UtilityMobs
-{
-    // This mod's id (lowercased for 1.12.2 - registry/resource domains must be lowercase).
+@Mod(_UtilityMobs.MODID)
+public class _UtilityMobs {
     public static final String MODID = "utilitymobs";
-    // This mod's version.
-    public static final String VERSION = "3.2.0";
+    public static final Logger LOG = LoggerFactory.getLogger("UtilityMobs");
 
     // If true, this mod starts up in debug mode.
     public static final boolean debug = false;
-    // The mod instance (used for GUI handler lookup).
-    public static _UtilityMobs instance;
-    // The common proxy for this mod.
-    @SidedProxy(clientSide = "toast.utilityMobs.client.ClientProxy", serverSide = "toast.utilityMobs.CommonProxy")
-    public static CommonProxy proxy;
     // The mod's random number generator.
     public static final Random random = new Random();
-    // The network channel for this mod.
-    public static SimpleNetworkWrapper CHANNEL;
 
     // The texture path prefix.
     public static final String TEXTURE = _UtilityMobs.MODID + ":textures/models/";
-    // The mod's creative tab (referencing it triggers its CreativeTabs registration).
-    public static final net.minecraft.creativetab.CreativeTabs CREATIVE_TAB = CreativeTabUtilityMobs.INSTANCE;
-    // Throwaway item used ONLY as the creative-tab icon (stone golem face). Not in any tab.
-    public static Item TAB_ICON;
-    // Invisible full-bright block the Jack o'Lantern Golem walks to light the area around itself.
-    public static Block GOLEM_LIGHT;
+
     // Spawn egg colors per individual mob (primary, secondary), parallel to UTILITY_NAMES[i][j].
     // Colors chosen to read as the block/material each mob is built from.
-    private static final int[][][] EGG_COLORS = {
+    public static final int[][][] EGG_COLORS = {
         { // Block golems (skeleton skull base)
             { 0x494949, 0x2B2B2B }, // AnvilGolem - anvil iron
             { 0x2E7D6B, 0x0A1A17 }, // ChestEnderGolem - ender teal
@@ -130,146 +88,31 @@ public class _UtilityMobs
         {/* creeper head */ "ArmorColossus", "ObsidianColossus", "StoneColossus" }
     };
 
-    // Registers the entities in this mod.
-    private void registerMobs() {
-        int id = 0;
-        String path;
-        EntityRegistry.registerModEntity(new ResourceLocation(_UtilityMobs.MODID, "genericgolem"), EntityUtilityGolem.class, "GenericGolem", id++, this, 80, 3, true);
-        // UM iron/snow golems are vanilla-mob variants. They get spawn eggs too (listed explicitly in the
-        // creative tab, since they're not part of UTILITY_NAMES).
-        EntityRegistry.registerModEntity(new ResourceLocation(_UtilityMobs.MODID, "umirongolem"), EntityUMIronGolem.class, "UMIronGolem", id++, this, 80, 3, true, 0xDCDCDC, 0xC9A0A0);
-        EntityRegistry.registerModEntity(new ResourceLocation(_UtilityMobs.MODID, "umsnowgolem"), EntityUMSnowGolem.class, "UMSnowGolem", id++, this, 80, 3, true, 0xEAF6FF, 0xE8870E);
-        for (int i = 0; i < _UtilityMobs.UTILITY_NAMES.length; i++) {
-            path = "toast.utilityMobs." + _UtilityMobs.decap(_UtilityMobs.UTILITY_TYPES[i]) + ".Entity";
-            for (int j = 0; j < _UtilityMobs.UTILITY_NAMES[i].length; j++) {
-                try {
-                    String name = _UtilityMobs.UTILITY_NAMES[i][j];
-                    @SuppressWarnings("unchecked")
-                    Class<? extends Entity> clazz = (Class<? extends Entity>)Class.forName(path + name);
-                    EntityRegistry.registerModEntity(new ResourceLocation(_UtilityMobs.MODID, name.toLowerCase()), clazz, name, id++, this, 80, 3, true, _UtilityMobs.EGG_COLORS[i][j][0], _UtilityMobs.EGG_COLORS[i][j][1]);
-                }
-                catch (ClassNotFoundException ex) {
-                    _UtilityMobs.debugException("@Entity" + _UtilityMobs.UTILITY_NAMES[i][j] + ": class not found!");
-                }
-            }
-        }
-        EntityRegistry.registerModEntity(new ResourceLocation(_UtilityMobs.MODID, "umfishhook"), EntityGolemFishHook.class, "UMFishHook", id++, this, 64, 5, true);
-        // Turret-fired arrow (EntityTippedArrow subclass) so despawning arrows can puff into particles
-        // instead of popping. Renders with the vanilla arrow renderer.
-        EntityRegistry.registerModEntity(new ResourceLocation(_UtilityMobs.MODID, "turret_arrow"), EntityTurretArrow.class, "TurretArrow", id++, this, 64, 3, true);
-    }
-
-    // Registers the recipes for this mod (1.12.2 registers IRecipe objects into the registry).
-    @Mod.EventBusSubscriber(modid = _UtilityMobs.MODID)
-    public static class RegistrationHandler {
-        // The only registered item: the hidden tab-icon item (stone golem face). No creative tab set,
-        // so it never appears in the inventory - it exists solely to render as the CreativeTab icon.
-        @SubscribeEvent
-        public static void onRegisterBlocks(RegistryEvent.Register<Block> event) {
-            Block light = new BlockGolemLight();
-            light.setRegistryName(new ResourceLocation(_UtilityMobs.MODID, "golem_light"));
-            _UtilityMobs.GOLEM_LIGHT = light;
-            event.getRegistry().register(light);
-        }
-
-        @SubscribeEvent
-        public static void onRegisterItems(RegistryEvent.Register<Item> event) {
-            Item icon = new Item();
-            icon.setRegistryName(new ResourceLocation(_UtilityMobs.MODID, "stonegolem_face"));
-            icon.setTranslationKey(_UtilityMobs.MODID + ".stonegolem_face");
-            _UtilityMobs.TAB_ICON = icon;
-            event.getRegistry().register(icon);
-
-            // Client-side: register the models now that the items exist.
-            _UtilityMobs.proxy.registerTabIconModel();
-        }
-
-        @SubscribeEvent
-        @SuppressWarnings("boxing")
-        public static void onRegisterRecipes(RegistryEvent.Register<IRecipe> event) {
-            IForgeRegistry<IRecipe> registry = event.getRegistry();
-            Item book = Properties.getBoolean(Properties.GENERAL, "alternate_manuals") ? Items.WRITABLE_BOOK : Items.BOOK;
-            // The mod's content is documented in a Patchouli guide book - vanilla book + pumpkin.
-            shapeless(registry, "guide_book", GuideBook.stack(), Items.BOOK, new ItemStack(Blocks.PUMPKIN));
-            shapeless(registry, "target_book_0", TargetHelper.book(0), book, new ItemStack(Items.BONE));
-            shapeless(registry, "target_book_1", TargetHelper.book(1), book, new ItemStack(Items.ROTTEN_FLESH));
-
-            RecipeSavePermissions savePermissions = new RecipeSavePermissions();
-            savePermissions.setRegistryName(new ResourceLocation(_UtilityMobs.MODID, "save_permissions"));
-            registry.register(savePermissions);
-
-            if (Properties.getBoolean(Properties.GENERAL, "wither_conversion")) {
-                ShapedOreRecipe wither = new ShapedOreRecipe(new ResourceLocation(_UtilityMobs.MODID, "wither_conversion"), new ItemStack(Items.SKULL),
-                        "&&&", "&@&", "&&&", '@', new ItemStack(Items.SKULL, 1, 1), '&', new ItemStack(Items.SPECKLED_MELON));
-                wither.setRegistryName(new ResourceLocation(_UtilityMobs.MODID, "wither_conversion"));
-                registry.register(wither);
-            }
-        }
-
-        // Registers a shapeless recipe with a (possibly NBT-bearing) fixed output.
-        private static void shapeless(IForgeRegistry<IRecipe> registry, String name, ItemStack output, Object... inputs) {
-            NonNullList<Ingredient> ingredients = NonNullList.create();
-            for (Object input : inputs) {
-                if (input instanceof Item) {
-                    ingredients.add(Ingredient.fromItem((Item)input));
-                }
-                else {
-                    ingredients.add(Ingredient.fromStacks((ItemStack)input));
-                }
-            }
-            ShapelessRecipes recipe = new ShapelessRecipes(_UtilityMobs.MODID, output, ingredients);
-            recipe.setRegistryName(new ResourceLocation(_UtilityMobs.MODID, name));
-            registry.register(recipe);
-        }
-    }
-
-    // Called before initialization. Loads the properties/configurations.
-    @Mod.EventHandler
-    public void preInit(FMLPreInitializationEvent event) {
-        _UtilityMobs.instance = this;
-        _UtilityMobs.debugConsole("Loading in debug mode!");
-        Properties.init(new Configuration(event.getSuggestedConfigurationFile()));
-        TargetHelper.SAVE_DIRECTORY = new File(event.getModConfigurationDirectory(), "UtilityMobs");
-
-        _UtilityMobs.CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel("UM|Info");
-        int id = 0;
-        _UtilityMobs.CHANNEL.registerMessage(MessageUseGolem.Handler.class, MessageUseGolem.class, id++, Side.SERVER);
-        _UtilityMobs.CHANNEL.registerMessage(MessageTargetHelper.Handler.class, MessageTargetHelper.class, id, Side.SERVER);
-        _UtilityMobs.CHANNEL.registerMessage(MessageTurretToggle.Handler.class, MessageTurretToggle.class, 4, Side.SERVER);
-        if (event.getSide() == Side.CLIENT) {
-            _UtilityMobs.CHANNEL.registerMessage(MessageTargetHelper.Handler.class, MessageTargetHelper.class, id++, Side.CLIENT);
-            _UtilityMobs.CHANNEL.registerMessage(MessageFetchTargetHelper.Handler.class, MessageFetchTargetHelper.class, id++, Side.CLIENT);
-            _UtilityMobs.CHANNEL.registerMessage(MessageExplosion.Handler.class, MessageExplosion.class, id++, Side.CLIENT);
-            _UtilityMobs.CHANNEL.registerMessage(MessageHealNumber.Handler.class, MessageHealNumber.class, 5, Side.CLIENT);
-        }
-        // Entity renderers MUST register in preInit: RenderManager runs loadEntityRenderers at the end of
-        // its constructor, which happens after preInit but before init. Registering in init is too late
-        // (factories never apply, entities fall back to RenderEntity = white box).
-        _UtilityMobs.proxy.registerRenderers();
-    }
-
-    // Called during initialization. Registers entities, mob spawns, and renderers.
-    @Mod.EventHandler
-    public void init(FMLInitializationEvent event) {
-        this.registerMobs();
-        NetworkRegistry.INSTANCE.registerGuiHandler(this, new GuiHelper());
-        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(new GuideBook());
+    public _UtilityMobs() {
+        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
+        ModRegistries.register(modBus);
+        // Touch the registration holders so their static DeferredRegister entries are created before
+        // the registry events fire.
+        ModEntities.STONE_GOLEM.getId();
+        toast.utilityMobs.setup.ModBlocks.GOLEM_LIGHT.getId();
+        toast.utilityMobs.setup.ModMenus.LANTERN_GOLEM.getId();
+        toast.utilityMobs.setup.ModMenus.TURRET_GOLEM.getId();
+        toast.utilityMobs.setup.ModMenus.STEAM_GOLEM.getId();
+        toast.utilityMobs.setup.ModRecipes.SAVE_PERMISSIONS.getId();
+        toast.utilityMobs.setup.ModItems.ADMIN_SWORD.getId();
+        CreativeTabUtilityMobs.TAB.getId();
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Properties.SPEC);
+        modBus.addListener(Properties::onConfigLoad);
+        // 1.12.2 set this in preInit from event.getModConfigurationDirectory(). FMLPaths.CONFIGDIR is
+        // the same directory (run/config), so the save path is unchanged: run/config/UtilityMobs.
+        // Must be assigned before any TargetHelper save/load runs, or every save throws and is swallowed.
+        TargetHelper.SAVE_DIRECTORY = new File(FMLPaths.CONFIGDIR.get().toFile(), "UtilityMobs");
+        toast.utilityMobs.network.UMChannel.register();
+        // Forge-bus subscribers. 1.12.2 constructed these in init; each still registers itself.
         new BuildHelper();
-        new TickHandler();
         new EventHandler();
-    }
-
-    // Registers this mod's server commands.
-    @Mod.EventHandler
-    public void serverStarting(FMLServerStartingEvent event) {
-        // Rebuild the global attack lists now that every mod has finished registering its entities. Entries
-        // resolved at our preInit could miss modded classes registered after us (mod load order); re-running
-        // the config load here fills in subclass coverage for those. Registry-id matching already handles the
-        // rest regardless of order. See TargetHelper.loadGlobalList.
-        Properties.reload();
-        event.registerServerCommand(new CommandUMSummon());
-        event.registerServerCommand(new CommandUMBlacklist());
-        event.registerServerCommand(new CommandUMWhitelist());
+        new TickHandler();
+        new GuideBook();
     }
 
     // Inserts a space before every capital letter (except the first).
@@ -297,32 +140,28 @@ public class _UtilityMobs
 
     // Prints the message to the console with this mod's name tag.
     public static void console(String... messages) {
-        String message = "[" + _UtilityMobs.MODID + "] [" + FMLCommonHandler.instance().getSide().name() + "] ";
+        StringBuilder message = new StringBuilder();
         for (String part : messages) {
-            message += part;
+            message.append(part);
         }
-        System.out.println(message);
+        LOG.info(message.toString());
     }
 
     // Prints the message to the console with this mod's name tag if debugging is enabled.
     public static void debugConsole(String... messages) {
         if (_UtilityMobs.debug) {
-            String message = "[" + _UtilityMobs.MODID + "] [" + FMLCommonHandler.instance().getSide().name() + "] ";
-            for (String part : messages) {
-                message += part;
-            }
-            System.out.println(message);
+            _UtilityMobs.console(messages);
         }
     }
 
     // Throws a runtime exception with a message and this mod's name tag if debugging is enabled.
     public static void debugException(String... messages) {
         if (_UtilityMobs.debug) {
-            String message = "[" + _UtilityMobs.MODID + "] [" + FMLCommonHandler.instance().getSide().name() + "] ";
+            StringBuilder message = new StringBuilder();
             for (String part : messages) {
-                message += part;
+                message.append(part);
             }
-            throw new RuntimeException(message);
+            throw new RuntimeException(message.toString());
         }
         if (messages.length > 0) {
             messages[0] = "[ERROR] " + messages[0];

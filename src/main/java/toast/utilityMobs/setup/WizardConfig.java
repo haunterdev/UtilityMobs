@@ -3,11 +3,9 @@ package toast.utilityMobs.setup;
 import java.util.HashMap;
 import java.util.Map;
 
-import net.minecraftforge.common.config.Configuration;
-import net.minecraftforge.common.config.Property;
 import toast.utilityMobs.Properties;
 
-/** Maps wizard selections to config key/value pairs, and writes them to the live Configuration. */
+/** Maps wizard selections to config key/value pairs, and writes them to the live config. */
 public abstract class WizardConfig {
 
     /** Pure, Minecraft-free: WizardState -> { "category@field" : Boolean|Integer|Double }. */
@@ -41,33 +39,21 @@ public abstract class WizardConfig {
         return m;
     }
 
-    /** Writes the resolved selections into the live mod Configuration, saves, and reloads. */
+    /**
+     * Writes the resolved selections into the live mod config, saves, and reloads.
+     *
+     * <p>1.12.2 walked the Configuration's categories and set each Property by hand, then called
+     * config.save() once. A ForgeConfigSpec has no category objects to walk, so Properties resolves
+     * "category@field" straight to the backing ConfigValue; the single save+reload at the end is
+     * unchanged, so a half-applied config is still not observable.
+     */
     public static void apply(WizardState s) {
-        Configuration config = Properties.config;
-        if (config == null) {
-            return;
-        }
         for (Map.Entry<String, Object> e : resolve(s).entrySet()) {
             int at = e.getKey().indexOf('@');
             String category = e.getKey().substring(0, at);
             String field = e.getKey().substring(at + 1);
-            if (!config.hasCategory(category)) {
-                continue;
-            }
-            Property prop = config.getCategory(category).get(field);
-            if (prop == null) {
-                continue;
-            }
-            Object val = e.getValue();
-            if (val instanceof Boolean) {
-                prop.set(((Boolean) val).booleanValue());
-            } else if (val instanceof Integer) {
-                prop.set(((Integer) val).intValue());
-            } else if (val instanceof Double) {
-                prop.set(((Double) val).doubleValue());
-            }
+            Properties.setValue(category, field, e.getValue());
         }
-        config.save();
-        Properties.reload();
+        Properties.save();
     }
 }

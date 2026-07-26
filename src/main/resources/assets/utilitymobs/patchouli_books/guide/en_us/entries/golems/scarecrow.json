@@ -20,10 +20,10 @@
           ]
         ],
         "mapping": {
-          "P": "minecraft:pumpkin[facing=north]",
-          "F": "minecraft:fence",
-          "W": "minecraft:wool",
-          "0": "minecraft:fence"
+          "P": "minecraft:carved_pumpkin[facing=north]",
+          "F": "minecraft:oak_fence",
+          "W": "minecraft:white_wool",
+          "0": "minecraft:oak_fence"
         }
       },
       "text": ""

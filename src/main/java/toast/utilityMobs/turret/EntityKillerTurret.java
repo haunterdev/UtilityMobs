@@ -2,15 +2,15 @@ package toast.utilityMobs.turret;
 
 import java.util.List;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.projectile.EntityTippedArrow;
-import net.minecraft.init.Blocks;
-import net.minecraft.item.Item;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.world.World;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import toast.utilityMobs.EnumUpgrade;
 import toast.utilityMobs.UMSound;
 
@@ -19,14 +19,14 @@ public class EntityKillerTurret extends EntityTurretGolem
     /// The texture for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation("utilitymobs:textures/models/turret/killerturret.png");
 
-    public EntityKillerTurret(World world) {
-        super(world);
+    public EntityKillerTurret(EntityType<? extends EntityKillerTurret> type, Level level) {
+        super(type, level);
         this.texture = EntityKillerTurret.TEXTURE;
     }
 
     @Override
-    public int getTotalArmorValue() {
-        return Math.min(20, super.getTotalArmorValue() + 18);
+    public int getArmorValue() {
+        return Math.min(20, super.getArmorValue() + 18);
     }
 
     @Override
@@ -36,33 +36,33 @@ public class EntityKillerTurret extends EntityTurretGolem
 
     @Override
     protected Item getDropItem() {
-        return Item.getItemFromBlock(Blocks.DIAMOND_BLOCK);
+        return Items.DIAMOND_BLOCK;
     }
 
-    /// Executes this golem's ranged attack.
+    /// Executes this golem's ranged attack. Fires at EVERY valid target in range at once.
     @Override
-    public void doRangedAttack(EntityLivingBase target) {
-        if (!this.world.isRemote) {
-            double range = this.getEntityAttribute(SharedMonsterAttributes.FOLLOW_RANGE).getAttributeValue();
-            List<Entity> entityList = this.world.getEntitiesWithinAABBExcludingEntity(this, this.getEntityBoundingBox().grow(range * 1.5, range * 1.5, range * 1.5));
-            EntityTippedArrow arrow = null;
+    public void doRangedAttack(LivingEntity target) {
+        if (!this.level().isClientSide) {
+            AttributeInstance rangeAttr = this.getAttribute(Attributes.FOLLOW_RANGE);
+            double range = rangeAttr == null ? 10.0 : rangeAttr.getValue();
+            List<Entity> entityList = this.level().getEntities(this, this.getBoundingBox().inflate(range * 1.5, range * 1.5, range * 1.5));
             for (Entity entity : entityList) {
                 if (this.canAttack(entity)) {
-                    arrow = new EntityTurretArrow(this.world, this);
-                    double dx = entity.posX - this.posX;
-                    double dy = (entity.getEntityBoundingBox().minY + entity.height * 0.5F) - arrow.posY;
-                    double dz = entity.posZ - this.posZ;
-                    double dist = (double)MathHelper.sqrt(dx * dx + dz * dz);
+                    EntityTurretArrow arrow = this.atMuzzle(new EntityTurretArrow(this.level(), this), entity);
+                    double dx = entity.getX() - arrow.getX();
+                    double dy = (entity.getBoundingBox().minY + entity.getBbHeight() * 0.5F) - arrow.getY();
+                    double dz = entity.getZ() - arrow.getZ();
+                    double dist = Math.sqrt(dx * dx + dz * dz);
                     arrow.shoot(dx, dy + dist * 0.15, dz, 1.6F, this.inaccuracyAt(dist));
-                    arrow.setDamage(this.getProjectileDamage());
+                    arrow.setBaseDamage(this.getProjectileDamage());
                     this.targetHelper.setOwned(arrow);
                     this.upgrade.applyToArrow(arrow);
                     EnumUpgrade.MULTISHOT.applyToArrow(arrow);
                     this.prepareFiredArrow(arrow);
-                    this.world.spawnEntity(arrow);
+                    this.level().addFreshEntity(arrow);
                 }
             }
         }
-        this.playSound(UMSound.BOW, 1.0F, 1.0F / (this.rand.nextFloat() * 0.4F + 0.8F));
+        this.playSound(UMSound.BOW, 1.0F, 1.0F / (this.random.nextFloat() * 0.4F + 0.8F));
     }
 }

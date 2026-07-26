@@ -1,95 +1,122 @@
 package toast.utilityMobs.client;
 
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
-import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.resources.I18n;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.network.chat.Component;
+
 import toast.utilityMobs.setup.WizardConfig;
 import toast.utilityMobs.setup.WizardState;
 
-/** First-launch experience picker. Independent decisions + one-click tier pre-fills. */
-public class GuiSetupWizard extends GuiScreen {
+/**
+ * First-launch experience picker. Independent decisions + one-click tier pre-fills.
+ *
+ * <p>1.12.2 gave every GuiButton a numeric id and dispatched on it in actionPerformed. 1.20.1 buttons
+ * carry an onPress callback instead, so the ids survive only as the row keys the label and description
+ * lookups already switch on - the toggle itself is now the callback. Layout, wording, tier presets and
+ * the tooltip line are unchanged.
+ */
+public class GuiSetupWizard extends Screen {
 
-    private final GuiScreen parent;
+    private final Screen parent;
     private final WizardState state;
 
-    private static final int ID_ENGINEER = 1, ID_WARLORD = 2, ID_SURVIVOR = 3, ID_CUSTOM = 4;
-    private static final int ID_CONFIRM = 100, ID_SKIP = 101;
     private static final int[] ROWS = {
         10, 11, 12, 13, 14, 15,   // left
         16, 17, 18, 19, 20, 21    // right
     };
 
-    public GuiSetupWizard(GuiScreen parent, WizardState initial) {
+    /// Row id -> its button, so refreshLabels can rewrite the label after a toggle.
+    private final List<Button> rowButtons = new ArrayList<Button>();
+
+    public GuiSetupWizard(Screen parent, WizardState initial) {
+        super(Component.translatable("utilitymobs.setup.title"));
         this.parent = parent;
         this.state = initial;
     }
 
     @Override
-    public boolean doesGuiPauseGame() {
+    public boolean isPauseScreen() {
         return true;
     }
 
     @Override
-    public void initGui() {
-        this.buttonList.clear();
+    protected void init() {
+        this.rowButtons.clear();
         int cx = this.width / 2;
 
         int tierY = 34;
         int tw = 86, tgap = 4;
         int tierStart = cx - (tw * 2 + tgap + tgap / 2);
-        this.buttonList.add(new GuiButton(ID_ENGINEER, tierStart, tierY, tw, 20, I18n.format("utilitymobs.setup.tier.engineer")));
-        this.buttonList.add(new GuiButton(ID_WARLORD, tierStart + tw + tgap, tierY, tw, 20, I18n.format("utilitymobs.setup.tier.warlord")));
-        this.buttonList.add(new GuiButton(ID_SURVIVOR, tierStart + 2 * (tw + tgap), tierY, tw, 20, I18n.format("utilitymobs.setup.tier.survivor")));
-        this.buttonList.add(new GuiButton(ID_CUSTOM, tierStart + 3 * (tw + tgap), tierY, tw, 20, I18n.format("utilitymobs.setup.tier.custom")));
+        this.addRenderableWidget(Button.builder(Component.translatable("utilitymobs.setup.tier.engineer"),
+                b -> this.copyInto(WizardState.engineer())).bounds(tierStart, tierY, tw, 20).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("utilitymobs.setup.tier.warlord"),
+                b -> this.copyInto(WizardState.warlord())).bounds(tierStart + tw + tgap, tierY, tw, 20).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("utilitymobs.setup.tier.survivor"),
+                b -> this.copyInto(WizardState.survivor())).bounds(tierStart + 2 * (tw + tgap), tierY, tw, 20).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("utilitymobs.setup.tier.custom"),
+                b -> this.copyInto(WizardState.custom())).bounds(tierStart + 3 * (tw + tgap), tierY, tw, 20).build());
 
         int bw = 158, bh = 20, vgap = 2;
         int leftX = cx - bw - 4;
         int rightX = cx + 4;
         int firstY = 66;
-        for (int i = 0; i < ROWS.length; i++) {
-            int id = ROWS[i];
+        for (int i = 0; i < GuiSetupWizard.ROWS.length; i++) {
+            int id = GuiSetupWizard.ROWS[i];
             boolean left = i < 6;
             int col = left ? leftX : rightX;
             int rowInCol = left ? i : i - 6;
             int y = firstY + rowInCol * (bh + vgap);
-            this.buttonList.add(new GuiButton(id, col, y, bw, bh, ""));
+            Button button = Button.builder(Component.empty(), b -> {
+                this.toggle(id);
+                this.refreshLabels();
+            }).bounds(col, y, bw, bh).build();
+            this.addRenderableWidget(button);
+            this.rowButtons.add(button);
         }
 
         int botY = this.height - 30;
-        this.buttonList.add(new GuiButton(ID_CONFIRM, cx - 154, botY, 150, 20, I18n.format("utilitymobs.setup.confirm")));
-        this.buttonList.add(new GuiButton(ID_SKIP, cx + 4, botY, 150, 20, I18n.format("utilitymobs.setup.skip")));
+        this.addRenderableWidget(Button.builder(Component.translatable("utilitymobs.setup.confirm"), b -> {
+            WizardConfig.apply(this.state);
+            SetupWizardHandler.writeMarker();
+            this.minecraft.setScreen(this.parent);
+        }).bounds(cx - 154, botY, 150, 20).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("utilitymobs.setup.skip"), b -> {
+            SetupWizardHandler.writeMarker();
+            this.minecraft.setScreen(this.parent);
+        }).bounds(cx + 4, botY, 150, 20).build());
 
-        refreshLabels();
+        this.refreshLabels();
     }
 
     private void refreshLabels() {
-        for (GuiButton b : this.buttonList) {
-            if (b.id >= 10 && b.id <= 21) {
-                b.displayString = labelFor(b.id);
-            }
+        for (int i = 0; i < this.rowButtons.size(); i++) {
+            this.rowButtons.get(i).setMessage(Component.literal(this.labelFor(GuiSetupWizard.ROWS[i])));
         }
     }
 
     private String onOff(boolean v) {
-        return I18n.format(v ? "utilitymobs.setup.on" : "utilitymobs.setup.off");
+        return I18n.get(v ? "utilitymobs.setup.on" : "utilitymobs.setup.off");
     }
 
     private String labelFor(int id) {
         switch (id) {
-            case 10: return I18n.format("utilitymobs.setup.row.attack_passives") + ": " + onOff(state.attackPassives);
-            case 11: return I18n.format("utilitymobs.setup.row.attack_neutrals") + ": " + onOff(state.attackNeutrals);
-            case 12: return I18n.format("utilitymobs.setup.row.hostile") + ": " + onOff(state.hostile);
-            case 13: return I18n.format("utilitymobs.setup.row.require_ammo") + ": " + onOff(state.requireAmmo);
-            case 14: return I18n.format("utilitymobs.setup.row.no_mob_aggro") + ": " + onOff(state.mobsIgnoreTurrets);
-            case 15: return I18n.format("utilitymobs.setup.row.passthrough") + ": " + onOff(state.friendlyPassthrough);
-            case 16: return I18n.format("utilitymobs.setup.row.skull") + ": " + I18n.format("utilitymobs.setup.skull." + state.skullDrops.name().toLowerCase());
-            case 17: return I18n.format("utilitymobs.setup.row.alt_manuals") + ": " + onOff(state.alternateManuals);
-            case 18: return I18n.format("utilitymobs.setup.row.give_book") + ": " + onOff(state.giveBook);
-            case 19: return I18n.format("utilitymobs.setup.row.collision") + ": " + onOff(state.walkableTurrets);
-            case 20: return I18n.format("utilitymobs.setup.row.drop_chance") + ": " + I18n.format("utilitymobs.setup.drop." + state.dropChance.name().toLowerCase());
-            case 21: return I18n.format("utilitymobs.setup.row.huge_armies") + ": " + onOff(state.hugeArmies);
+            case 10: return I18n.get("utilitymobs.setup.row.attack_passives") + ": " + this.onOff(this.state.attackPassives);
+            case 11: return I18n.get("utilitymobs.setup.row.attack_neutrals") + ": " + this.onOff(this.state.attackNeutrals);
+            case 12: return I18n.get("utilitymobs.setup.row.hostile") + ": " + this.onOff(this.state.hostile);
+            case 13: return I18n.get("utilitymobs.setup.row.require_ammo") + ": " + this.onOff(this.state.requireAmmo);
+            case 14: return I18n.get("utilitymobs.setup.row.no_mob_aggro") + ": " + this.onOff(this.state.mobsIgnoreTurrets);
+            case 15: return I18n.get("utilitymobs.setup.row.passthrough") + ": " + this.onOff(this.state.friendlyPassthrough);
+            case 16: return I18n.get("utilitymobs.setup.row.skull") + ": " + I18n.get("utilitymobs.setup.skull." + this.state.skullDrops.name().toLowerCase());
+            case 17: return I18n.get("utilitymobs.setup.row.alt_manuals") + ": " + this.onOff(this.state.alternateManuals);
+            case 18: return I18n.get("utilitymobs.setup.row.give_book") + ": " + this.onOff(this.state.giveBook);
+            case 19: return I18n.get("utilitymobs.setup.row.collision") + ": " + this.onOff(this.state.walkableTurrets);
+            case 20: return I18n.get("utilitymobs.setup.row.drop_chance") + ": " + I18n.get("utilitymobs.setup.drop." + this.state.dropChance.name().toLowerCase());
+            case 21: return I18n.get("utilitymobs.setup.row.huge_armies") + ": " + this.onOff(this.state.hugeArmies);
             default: return "";
         }
     }
@@ -112,66 +139,49 @@ public class GuiSetupWizard extends GuiScreen {
         }
     }
 
-    @Override
-    protected void actionPerformed(GuiButton button) throws IOException {
-        switch (button.id) {
-            case ID_ENGINEER: copyInto(WizardState.engineer()); break;
-            case ID_WARLORD:  copyInto(WizardState.warlord());  break;
-            case ID_SURVIVOR: copyInto(WizardState.survivor()); break;
-            case ID_CUSTOM:   copyInto(WizardState.custom());   break;
-
-            case 10: state.attackPassives = !state.attackPassives; break;
-            case 11: state.attackNeutrals = !state.attackNeutrals; break;
-            case 12: state.hostile = !state.hostile; break;
-            case 13: state.requireAmmo = !state.requireAmmo; break;
-            case 14: state.mobsIgnoreTurrets = !state.mobsIgnoreTurrets; break;
-            case 15: state.friendlyPassthrough = !state.friendlyPassthrough; break;
-            case 16: state.nextSkull(); break;
-            case 17: state.alternateManuals = !state.alternateManuals; break;
-            case 18: state.giveBook = !state.giveBook; break;
-            case 19: state.walkableTurrets = !state.walkableTurrets; break;
-            case 20: state.nextDrop(); break;
-            case 21: state.hugeArmies = !state.hugeArmies; break;
-
-            case ID_CONFIRM:
-                WizardConfig.apply(state);
-                SetupWizardHandler.writeMarker();
-                this.mc.displayGuiScreen(parent);
-                return;
-            case ID_SKIP:
-                SetupWizardHandler.writeMarker();
-                this.mc.displayGuiScreen(parent);
-                return;
-            default:
-                return;
+    private void toggle(int id) {
+        switch (id) {
+            case 10: this.state.attackPassives = !this.state.attackPassives; break;
+            case 11: this.state.attackNeutrals = !this.state.attackNeutrals; break;
+            case 12: this.state.hostile = !this.state.hostile; break;
+            case 13: this.state.requireAmmo = !this.state.requireAmmo; break;
+            case 14: this.state.mobsIgnoreTurrets = !this.state.mobsIgnoreTurrets; break;
+            case 15: this.state.friendlyPassthrough = !this.state.friendlyPassthrough; break;
+            case 16: this.state.nextSkull(); break;
+            case 17: this.state.alternateManuals = !this.state.alternateManuals; break;
+            case 18: this.state.giveBook = !this.state.giveBook; break;
+            case 19: this.state.walkableTurrets = !this.state.walkableTurrets; break;
+            case 20: this.state.nextDrop(); break;
+            case 21: this.state.hugeArmies = !this.state.hugeArmies; break;
+            default: break;
         }
-        refreshLabels();
     }
 
     private void copyInto(WizardState t) {
-        state.requireAmmo = t.requireAmmo;
-        state.mobsIgnoreTurrets = t.mobsIgnoreTurrets;
-        state.friendlyPassthrough = t.friendlyPassthrough;
-        state.walkableTurrets = t.walkableTurrets;
-        state.attackPassives = t.attackPassives;
-        state.attackNeutrals = t.attackNeutrals;
-        state.hostile = t.hostile;
-        state.alternateManuals = t.alternateManuals;
-        state.giveBook = t.giveBook;
-        state.hugeArmies = t.hugeArmies;
-        state.dropChance = t.dropChance;
-        state.skullDrops = t.skullDrops;
+        this.state.requireAmmo = t.requireAmmo;
+        this.state.mobsIgnoreTurrets = t.mobsIgnoreTurrets;
+        this.state.friendlyPassthrough = t.friendlyPassthrough;
+        this.state.walkableTurrets = t.walkableTurrets;
+        this.state.attackPassives = t.attackPassives;
+        this.state.attackNeutrals = t.attackNeutrals;
+        this.state.hostile = t.hostile;
+        this.state.alternateManuals = t.alternateManuals;
+        this.state.giveBook = t.giveBook;
+        this.state.hugeArmies = t.hugeArmies;
+        this.state.dropChance = t.dropChance;
+        this.state.skullDrops = t.skullDrops;
+        this.refreshLabels();
     }
 
     @Override
-    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
-        this.drawDefaultBackground();
-        this.drawCenteredString(this.fontRenderer, I18n.format("utilitymobs.setup.title"), this.width / 2, 14, 0xFFFFFF);
-        super.drawScreen(mouseX, mouseY, partialTicks);
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        this.renderBackground(graphics);
+        graphics.drawCenteredString(this.font, I18n.get("utilitymobs.setup.title"), this.width / 2, 14, 0xFFFFFF);
+        super.render(graphics, mouseX, mouseY, partialTicks);
 
-        for (GuiButton b : this.buttonList) {
-            if (b.id >= 10 && b.id <= 21 && b.isMouseOver()) {
-                this.drawCenteredString(this.fontRenderer, I18n.format(descKeyFor(b.id)),
+        for (int i = 0; i < this.rowButtons.size(); i++) {
+            if (this.rowButtons.get(i).isHovered()) {
+                graphics.drawCenteredString(this.font, I18n.get(this.descKeyFor(GuiSetupWizard.ROWS[i])),
                         this.width / 2, this.height - 44, 0xA0A0A0);
                 break;
             }

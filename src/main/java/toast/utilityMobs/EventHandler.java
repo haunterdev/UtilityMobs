@@ -1,56 +1,52 @@
 package toast.utilityMobs;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLiving;
-import net.minecraft.entity.IProjectile;
-import net.minecraft.entity.item.EntityItem;
-import net.minecraft.entity.monster.EntityCreeper;
-import net.minecraft.entity.monster.EntitySkeleton;
-import net.minecraft.entity.passive.EntityChicken;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.projectile.EntityArrow;
-import net.minecraft.entity.projectile.EntityFireball;
-import net.minecraft.init.Items;
-import net.minecraft.init.MobEffects;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.network.chat.Component;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.animal.Chicken;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Skeleton;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.entity.projectile.Fireball;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.DyeItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.InteractionHand;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.fml.client.event.ConfigChangedEvent;
-import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.ProjectileImpactEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
-import net.minecraftforge.event.entity.living.LivingSetAttackTargetEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
+import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraft.item.EnumDyeColor;
-import net.minecraft.util.EnumHand;
-import net.minecraft.util.text.TextComponentString;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraft.util.DamageSource;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import toast.utilityMobs.colossal.EntityColossalGolem;
 import toast.utilityMobs.golem.EntityUtilityGolem;
 import toast.utilityMobs.turret.EntityTurretGolem;
 
+/**
+ * The mod's Forge event subscribers.
+ *
+ * <p>1.12.2's onConfigChanged is gone: it existed to re-read the file after the in-game config GUI
+ * saved it, and ForgeConfigSpec now fires its own reload event, which Properties already listens for.
+ */
 public class EventHandler
 {
     public EventHandler() {
         MinecraftForge.EVENT_BUS.register(this);
-    }
-
-    /**
-     * Fired when the in-game config GUI saves changes. Re-reads our config values so they apply without a restart.
-     */
-    @SubscribeEvent
-    public void onConfigChanged(ConfigChangedEvent.OnConfigChangedEvent event) {
-        if (!_UtilityMobs.MODID.equals(event.getModID())) {
-            return;
-        }
-        if (Properties.config != null && Properties.config.hasChanged()) {
-            Properties.config.save();
-        }
-        Properties.reload();
     }
 
     /**
@@ -60,17 +56,16 @@ public class EventHandler
      * saved golems restore their owner from NBT before this fires, so reloads are not reassigned.
      */
     @SubscribeEvent(priority = EventPriority.NORMAL)
-    public void onEntityJoinWorld(EntityJoinWorldEvent event) {
+    public void onEntityJoinLevel(EntityJoinLevelEvent event) {
         Entity entity = event.getEntity();
-        if (entity == null || entity.world.isRemote || !(entity instanceof EntityUtilityGolem))
+        if (entity == null || entity.level().isClientSide || !(entity instanceof EntityUtilityGolem golem))
             return;
-        EntityUtilityGolem golem = (EntityUtilityGolem) entity;
         String owner = golem.getOwnerName();
         if (owner != null && !owner.isEmpty())
             return; // already owned (built in-world, or restored from save, or a /umsummon team golem)
-        EntityPlayer player = entity.world.getClosestPlayer(entity.posX, entity.posY, entity.posZ, 8.0, false);
+        Player player = entity.level().getNearestPlayer(entity.getX(), entity.getY(), entity.getZ(), 8.0, false);
         if (player != null) {
-            golem.setOwner(player.getName());
+            golem.setOwner(player.getGameProfile().getName());
         }
     }
 
@@ -82,99 +77,122 @@ public class EventHandler
      */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onDyeGolemTeam(PlayerInteractEvent.EntityInteract event) {
-        if (event.getHand() != EnumHand.MAIN_HAND || !(event.getTarget() instanceof EntityUtilityGolem))
+        if (event.getHand() != InteractionHand.MAIN_HAND || !(event.getTarget() instanceof EntityUtilityGolem golem))
             return;
-        EntityPlayer player = event.getEntityPlayer();
-        ItemStack held = player.getHeldItemMainhand();
-        if (held.isEmpty() || held.getItem() != Items.DYE)
+        Player player = event.getEntity();
+        ItemStack held = player.getMainHandItem();
+        // 1.12.2 had one Items.DYE whose metadata picked the colour; each dye is its own item now.
+        if (held.isEmpty() || !(held.getItem() instanceof DyeItem dye))
             return;
-        EntityUtilityGolem golem = (EntityUtilityGolem) event.getTarget();
-        if (!player.capabilities.isCreativeMode && !golem.canInteract(player))
+        if (!player.getAbilities().instabuild && !golem.canInteract(player))
             return;
-        if (!event.getWorld().isRemote) {
-            EnumDyeColor color = EnumDyeColor.byDyeDamage(held.getMetadata() & 15);
-            golem.setOwner(EntityUtilityGolem.TEAM_PREFIX + color.getName());
-            if (!player.capabilities.isCreativeMode) {
+        if (!event.getLevel().isClientSide) {
+            String color = dye.getDyeColor().getName();
+            golem.setOwner(EntityUtilityGolem.TEAM_PREFIX + color);
+            if (!player.getAbilities().instabuild) {
                 held.shrink(1);
             }
-            player.sendStatusMessage(new TextComponentString("Team: " + color.getName()), true);
+            player.displayClientMessage(Component.literal("Team: " + color), true);
         }
         event.setCanceled(true);
     }
 
     /**
-     * Called by EntityLiving.onDeath() - adds skeleton/creeper skull drops.
+     * Called by LivingEntity.die() - adds skeleton/creeper skull drops.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onLivingDrops(LivingDropsEvent event) {
-        // In 1.12.2 wither skeletons are a separate class, so EntitySkeleton is only the normal skeleton.
+        // Wither skeletons are a separate class, so Skeleton is only the normal skeleton.
         int skullRarity = Properties.getInt(Properties.GENERAL, "skull_rarity");
         int creeperRarity = Properties.getInt(Properties.GENERAL, "creeper_head_rarity");
-        if (skullRarity > 0 && event.getEntityLiving() != null && !event.getEntityLiving().world.isRemote && event.isRecentlyHit() && event.getEntityLiving() instanceof EntitySkeleton) {
+        LivingEntity dead = event.getEntity();
+        if (dead == null || dead.level().isClientSide || !event.isRecentlyHit())
+            return;
+        if (skullRarity > 0 && dead instanceof Skeleton) {
             int rarity = skullRarity - event.getLootingLevel();
-            if (rarity <= 0 || event.getEntityLiving().getRNG().nextInt(rarity) == 0) {
-                EntityItem drop = new EntityItem(event.getEntityLiving().world, event.getEntityLiving().posX, event.getEntityLiving().posY, event.getEntityLiving().posZ, new ItemStack(Items.SKULL));
-                drop.setPickupDelay(10);
-                event.getDrops().add(drop);
+            if (rarity <= 0 || dead.getRandom().nextInt(rarity) == 0) {
+                EventHandler.addDrop(event, dead, new ItemStack(Items.SKELETON_SKULL));
             }
         }
-        else if (creeperRarity > 0 && event.getEntityLiving() != null && !event.getEntityLiving().world.isRemote && event.isRecentlyHit() && event.getEntityLiving() instanceof EntityCreeper) {
+        else if (creeperRarity > 0 && dead instanceof Creeper creeper) {
             int rarity = creeperRarity - event.getLootingLevel();
-            if (((EntityCreeper) event.getEntityLiving()).getPowered()) {
+            if (creeper.isPowered()) {
                 rarity >>= 1;
             }
-            if (rarity <= 0 || event.getEntityLiving().getRNG().nextInt(rarity) == 0) {
-                EntityItem drop = new EntityItem(event.getEntityLiving().world, event.getEntityLiving().posX, event.getEntityLiving().posY, event.getEntityLiving().posZ, new ItemStack(Items.SKULL, 1, 4));
-                drop.setPickupDelay(10);
-                event.getDrops().add(drop);
+            if (rarity <= 0 || dead.getRandom().nextInt(rarity) == 0) {
+                EventHandler.addDrop(event, dead, new ItemStack(Items.CREEPER_HEAD));
             }
         }
     }
 
+    private static void addDrop(LivingDropsEvent event, LivingEntity dead, ItemStack stack) {
+        ItemEntity drop = new ItemEntity(dead.level(), dead.getX(), dead.getY(), dead.getZ(), stack);
+        drop.setPickUpDelay(10);
+        event.getDrops().add(drop);
+    }
+
     /**
-     * Called by EntityLivingBase.attackEntityFrom() - applies projectile upgrade effects.
+     * Called by LivingEntity.hurt() - applies projectile upgrade effects.
      */
     @SubscribeEvent(priority = EventPriority.NORMAL)
     public void onLivingAttack(LivingAttackEvent event) {
-        if (event.getSource() != null) {
-            Entity attacker = event.getSource().getImmediateSource();
-            if (attacker instanceof EntityArrow || attacker instanceof IProjectile || attacker instanceof EntityFireball) {
-                if (TargetHelper.hasOwner(attacker)) {
-                    TargetHelper targetHelper = TargetHelper.getOwnerTargetHelper(attacker);
-                    if (!targetHelper.isValidTarget(event.getEntityLiving())) {
-                        event.setCanceled(true);
-                        return;
-                    }
-                    // Owned turret/golem fire ignores the target's hit-immunity frames, so every arrow
-                    // that connects deals its damage instead of bouncing off a mob that is still flashing
-                    // from a prior hit or is a slime fresh off a bounce. This event fires at the start of
-                    // attackEntityFrom (before the invulnerability check), so zeroing it here lands the hit.
-                    event.getEntityLiving().hurtResistantTime = 0;
-                }
+        if (event.getSource() == null)
+            return;
+        // Never react to explosion damage. 1.12.2 got this for free: DamageSource.causeExplosionDamage
+        // built a plain DamageSource("explosion") whenever the exploder was not a living entity, so
+        // getImmediateSource() was null and the "attacker is an arrow" test below failed. 1.20.1's
+        // DamageSources.explosion reports the exploder itself as the DIRECT entity, so for an explosive
+        // arrow the direct entity is that same arrow: the handler would fire again on the explosion it
+        // had just caused, explode again, and recurse until the server died. The upgrades are meant to
+        // trigger on the projectile hit, not on the blast's own damage.
+        if (event.getSource().is(DamageTypeTags.IS_EXPLOSION))
+            return;
+        Entity attacker = event.getSource().getDirectEntity();
+        LivingEntity victim = event.getEntity();
+        if (!(attacker instanceof AbstractArrow) && !(attacker instanceof Projectile) && !(attacker instanceof Fireball))
+            return;
 
-                if (EnumUpgrade.MULTISHOT.isApplied(attacker)) {
-                    event.getEntityLiving().hurtResistantTime = 0;
+        if (TargetHelper.hasOwner(attacker)) {
+            TargetHelper targetHelper = TargetHelper.getOwnerTargetHelper(attacker);
+            if (!targetHelper.isValidTarget(victim)) {
+                event.setCanceled(true);
+                return;
+            }
+            // Owned turret/golem fire ignores the target's hit-immunity frames, so every arrow
+            // that connects deals its damage instead of bouncing off a mob that is still flashing
+            // from a prior hit or is a slime fresh off a bounce. This event fires at the start of
+            // hurt (before the invulnerability check), so zeroing it here lands the hit.
+            victim.invulnerableTime = 0;
+        }
+
+        if (EnumUpgrade.MULTISHOT.isApplied(attacker)) {
+            victim.invulnerableTime = 0;
+        }
+        if (EnumUpgrade.POISON.isApplied(attacker)) {
+            EffectHelper.stackEffect(victim, MobEffects.POISON, 3 * 20, 0, 1);
+        }
+        if (EnumUpgrade.SLOW.isApplied(attacker)) {
+            EffectHelper.stackEffect(victim, MobEffects.MOVEMENT_SLOWDOWN, 3 * 20, 0, 4);
+        }
+        if (EnumUpgrade.EXPLOSIVE.isApplied(attacker)) {
+            EffectHelper.explodeSafe(attacker, 1.0F);
+        }
+        if (EnumUpgrade.FIRE_EXPLOSIVE.isApplied(attacker)) {
+            EffectHelper.explodeFireSafe(attacker, 1.0F);
+        }
+        if (EnumUpgrade.EGG.isApplied(attacker)) {
+            // canChangeDimensions is 1.20.1's stand-in for 1.12.2's isNonBoss: the dragon and the wither
+            // are the two entities that override it to false. It is also false while riding or ridden,
+            // which only means a mounted mob is never turned into a chicken.
+            if (!victim.level().isClientSide && attacker instanceof AbstractArrow arrow && !(victim instanceof Player)
+                    && victim.canChangeDimensions() && victim.getHealth() < arrow.getBaseDamage() * 2) {
+                Level level = victim.level();
+                Chicken chicken = EntityType.CHICKEN.create(level);
+                if (chicken != null) {
+                    chicken.moveTo(victim.getX(), victim.getY(), victim.getZ(), victim.getYRot(), victim.getXRot());
+                    level.addFreshEntity(chicken);
                 }
-                if (EnumUpgrade.POISON.isApplied(attacker)) {
-                    EffectHelper.stackEffect(event.getEntityLiving(), MobEffects.POISON, 3 * 20, 0, 1);
-                }
-                if (EnumUpgrade.SLOW.isApplied(attacker)) {
-                    EffectHelper.stackEffect(event.getEntityLiving(), MobEffects.SLOWNESS, 3 * 20, 0, 4);
-                }
-                if (EnumUpgrade.EXPLOSIVE.isApplied(attacker)) {
-                    EffectHelper.explodeSafe(attacker, 1.0F);
-                }
-                if (EnumUpgrade.FIRE_EXPLOSIVE.isApplied(attacker)) {
-                    EffectHelper.explodeFireSafe(attacker, 1.0F);
-                }
-                if (EnumUpgrade.EGG.isApplied(attacker)) {
-                    if (!event.getEntityLiving().world.isRemote && attacker instanceof EntityArrow && !(event.getEntityLiving() instanceof EntityPlayer) && event.getEntityLiving().isNonBoss() && event.getEntityLiving().getHealth() < ((EntityArrow) attacker).getDamage() * 2) {
-                        EntityChicken chicken = new EntityChicken(event.getEntityLiving().world);
-                        chicken.setLocationAndAngles(event.getEntityLiving().posX, event.getEntityLiving().posY, event.getEntityLiving().posZ, event.getEntityLiving().rotationYaw, event.getEntityLiving().rotationPitch);
-                        event.getEntityLiving().world.spawnEntity(chicken);
-                        event.getEntityLiving().setDead();
-                    }
-                }
+                victim.discard();
             }
         }
     }
@@ -185,8 +203,8 @@ public class EventHandler
      */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onPlayerAttackWhileRiding(AttackEntityEvent event) {
-        EntityPlayer player = event.getEntityPlayer();
-        if (player != null && player.getRidingEntity() instanceof EntityColossalGolem) {
+        Player player = event.getEntity();
+        if (player != null && player.getVehicle() instanceof EntityColossalGolem) {
             event.setCanceled(true);
         }
     }
@@ -197,33 +215,36 @@ public class EventHandler
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onRiderHurt(LivingAttackEvent event) {
-        if (!(event.getEntityLiving() instanceof EntityPlayer))
+        if (!(event.getEntity() instanceof Player))
             return;
-        Entity mount = event.getEntityLiving().getRidingEntity();
+        Entity mount = event.getEntity().getVehicle();
         if (!(mount instanceof EntityColossalGolem))
             return;
         DamageSource source = event.getSource();
-        if (source == null || source.getTrueSource() == mount || source.getImmediateSource() == mount)
+        if (source == null || source.getEntity() == mount || source.getDirectEntity() == mount)
             return;
         event.setCanceled(true);
-        mount.attackEntityFrom(source, event.getAmount());
+        mount.hurt(source, event.getAmount());
     }
 
     /**
      * Called when any living entity acquires an attack target. When the no_mob_aggro option is on,
-     * clears the target (and revenge target) if it is a turret, so mobs never retaliate against turrets.
+     * refuses the target (and clears the revenge target) if it is a turret, so mobs never retaliate
+     * against turrets.
+     *
+     * <p>1.12.2's LivingSetAttackTargetEvent fired after the fact, so the only cure was to set the
+     * target back to null. 1.20.1's LivingChangeTargetEvent fires first and is cancelable, so the
+     * target is simply never taken - and the old comment about the null re-fire not looping is moot.
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void onSetAttackTarget(LivingSetAttackTargetEvent event) {
+    public void onSetAttackTarget(LivingChangeTargetEvent event) {
         if (!Properties.getBoolean("turrets", "no_mob_aggro"))
             return;
-        if (!(event.getTarget() instanceof EntityTurretGolem))
+        if (!(event.getNewTarget() instanceof EntityTurretGolem))
             return;
-        if (event.getEntityLiving() instanceof EntityLiving) {
-            EntityLiving mob = (EntityLiving) event.getEntityLiving();
-            // Setting null re-fires this event with a null target, which fails the instanceof check above (no loop).
-            mob.setAttackTarget(null);
-            mob.setRevengeTarget(null);
+        event.setCanceled(true);
+        if (event.getEntity() instanceof Mob mob) {
+            mob.setLastHurtByMob(null);
         }
     }
 
@@ -241,42 +262,28 @@ public class EventHandler
     public void onProjectileImpact(ProjectileImpactEvent event) {
         if (!Properties.getBoolean("turrets", "friendly_passthrough"))
             return;
-        RayTraceResult ray = event.getRayTraceResult();
-        if (ray == null || ray.entityHit == null || !(ray.entityHit instanceof EntityUtilityGolem))
+        HitResult ray = event.getRayTraceResult();
+        if (!(ray instanceof EntityHitResult hit) || !(hit.getEntity() instanceof EntityUtilityGolem hitGolem))
             return;
-        EntityUtilityGolem hitGolem = (EntityUtilityGolem) ray.entityHit;
-        Entity projectile = event.getEntity();
+        Projectile projectile = event.getProjectile();
         if (projectile == null)
             return;
         // 1) Shooter-based: the most reliable signal. The firing golem is a friend of the hit golem
         //    unless they are on opposing battle teams (so you can still shoot enemy /umsummon golems).
-        Entity shooter = projectileShooter(projectile);
-        if (shooter instanceof EntityUtilityGolem && !((EntityUtilityGolem) shooter).isEnemyTeam(hitGolem)) {
+        //    1.12.2 needed obfuscation-safe reflection to read the shooter; Projectile.getOwner() is public now.
+        Entity shooter = projectile.getOwner();
+        if (shooter instanceof EntityUtilityGolem shooterGolem && !shooterGolem.isEnemyTeam(hitGolem)) {
             event.setCanceled(true);
             return;
         }
         // 2) Owner-tag fallback: same owner, or a golem with no owner yet (freshly built/summoned).
         if (TargetHelper.hasOwner(projectile)) {
-            String projOwner = projectile.getEntityData().getString("UM|owner");
+            String projOwner = projectile.getPersistentData().getString("UM|owner");
             String golemOwner = hitGolem.getOwnerName();
             if (projOwner != null && !projOwner.isEmpty()
                     && (projOwner.equals(golemOwner) || golemOwner == null || golemOwner.isEmpty())) {
                 event.setCanceled(true);
             }
         }
-    }
-
-    /** Best-effort lookup of the entity that fired a projectile (arrow/fireball), via the obfuscation-safe
-        SRG field name so it resolves in both the dev and the shipped (obfuscated) runtime. Returns null if
-        the projectile type isn't handled or the field can't be read. */
-    private static Entity projectileShooter(Entity projectile) {
-        try {
-            if (projectile instanceof EntityArrow) {
-                return net.minecraftforge.fml.common.ObfuscationReflectionHelper.getPrivateValue(
-                        EntityArrow.class, (EntityArrow) projectile, "field_70250_c");
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
     }
 }

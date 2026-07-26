@@ -21,7 +21,7 @@
         ],
         "mapping": {
           "D": "minecraft:dispenser",
-          "F": "minecraft:fence",
+          "F": "minecraft:oak_fence",
           "0": "minecraft:gold_block"
         }
       },
@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:gatlingturret",
+      "entity": "utilitymobs:gatling_turret",
       "name": "Gatling Turret",
       "text": "Health: 20  Armor: 6$(br)Damage: 1  Range: 10$(br)Shots: 1  Atk speed: 13.3"
     }

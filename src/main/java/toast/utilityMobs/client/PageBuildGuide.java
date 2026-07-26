@@ -4,63 +4,78 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
 
-import javax.vecmath.Matrix4f;
-import javax.vecmath.Vector4f;
-
 import com.google.gson.annotations.SerializedName;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.state.IBlockState;
-import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.renderer.BlockRendererDispatcher;
-import net.minecraft.client.renderer.BufferBuilder;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.RenderHelper;
-import net.minecraft.client.renderer.Tessellator;
-import net.minecraft.client.renderer.block.model.IBakedModel;
-import net.minecraft.client.renderer.texture.TextureMap;
-import net.minecraft.client.renderer.tileentity.TileEntityRendererDispatcher;
-import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.tileentity.TileEntitySkull;
-import net.minecraft.util.BlockRenderLayer;
-import net.minecraft.util.EnumBlockRenderType;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.IBlockAccess;
-import net.minecraftforge.client.ForgeHooksClient;
-import net.minecraftforge.client.MinecraftForgeClient;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.block.BlockRenderDispatcher;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SkullBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+
+import org.joml.Matrix4f;
+import org.joml.Vector4f;
 
 import vazkii.patchouli.api.IMultiblock;
+import vazkii.patchouli.api.PatchouliAPI;
 import vazkii.patchouli.client.base.ClientTicker;
 import vazkii.patchouli.client.base.PersistentData;
+import vazkii.patchouli.client.base.PersistentData.Bookmark;
+import vazkii.patchouli.client.book.BookContentsBuilder;
 import vazkii.patchouli.client.book.BookEntry;
+import vazkii.patchouli.client.book.LiquidBlockVertexConsumer;
 import vazkii.patchouli.client.book.gui.GuiBook;
 import vazkii.patchouli.client.book.gui.GuiBookEntry;
 import vazkii.patchouli.client.book.gui.button.GuiButtonBookEye;
 import vazkii.patchouli.client.book.page.abstr.PageWithText;
 import vazkii.patchouli.client.handler.MultiblockVisualizationHandler;
-import vazkii.patchouli.common.multiblock.Multiblock;
+import vazkii.patchouli.common.multiblock.AbstractMultiblock;
 import vazkii.patchouli.common.multiblock.MultiblockRegistry;
 import vazkii.patchouli.common.multiblock.SerializedMultiblock;
+import vazkii.patchouli.xplat.IClientXplatAbstractions;
 
 /**
-    Custom Patchouli page type ("utilitymobs:build_guide"). A near-verbatim copy of Patchouli's
-    PageMultiblock, but with three JSON-controllable display knobs the built-in page lacks:
-
-      "offset_x" / "offset_y"  screen-pixel nudge of the rendered structure (default 0)
-      "scale"                  multiplier on the auto-fit scale (default 1.0; <1 adds frame margin)
-
-    Defaults reproduce vanilla Patchouli rendering exactly, so untuned pages look identical to the
-    stock "multiblock" type. Lives in our own package (all Patchouli members it touches are public),
-    so no patchouli-package source injection is needed. Registered in ClientProxy.
+ * Custom Patchouli page type ("utilitymobs:build_guide"). A near-verbatim copy of Patchouli's
+ * PageMultiblock, but with three JSON-controllable display knobs the built-in page lacks:
+ *
+ * <pre>
+ *   "offset_x" / "offset_y"  screen-pixel nudge of the rendered structure (default 0)
+ *   "scale"                  multiplier on the auto-fit scale (default 1.0; &lt;1 adds frame margin)
+ * </pre>
+ *
+ * <p>Defaults reproduce vanilla Patchouli rendering exactly, so untuned pages look identical to the
+ * stock "multiblock" type. Lives in our own package (all Patchouli members it touches are public),
+ * so no patchouli-package source injection is needed. Registered in {@link ClientSetup}.
+ *
+ * <p>Ported against 1.20.1's PageMultiblock, which rewrote the render for the PoseStack/buffer-source
+ * pipeline. That deleted a lot of what the 1.12.2 copy had to carry: the per-tile lighting/blend/cull
+ * reset, the render-pass juggling and the negative-scale culling workaround are all gone, because
+ * blocks and block entities now batch into one buffer source instead of mutating global GL state.
  */
 public class PageBuildGuide extends PageWithText {
+    private static final RandomSource RAND = RandomSource.createNewThreadLocalInstance();
 
-    String name;
+    String name = "";
     @SerializedName("multiblock_id")
-    String multiblockId;
+    ResourceLocation multiblockId;
     @SerializedName("multiblock")
     SerializedMultiblock serializedMultiblock;
     @SerializedName("enable_visualize")
@@ -78,22 +93,27 @@ public class PageBuildGuide extends PageWithText {
     @SerializedName("cycle_heads")
     boolean cycleHeads = false;
 
-    // Head types we cycle through (TileEntitySkull): skeleton, wither skeleton, zombie, creeper. Player(3)
-    // needs a GameProfile and the dragon(5) head is far too large to read in the small page frame.
-    private static final int[] HEAD_TYPES = { 0, 1, 2, 4 };
+    // Head types we cycle through: skeleton, wither skeleton, zombie, creeper. The player head needs a
+    // GameProfile and the dragon head is far too large to read in the small page frame. 1.12.2 listed
+    // these as TileEntitySkull type ids { 0, 1, 2, 4 }; in 1.20.1 the head type IS the block, so the
+    // cycle swaps the block state the renderer reads instead of a field on the block entity.
+    private static final Block[] HEAD_TYPES = {
+        Blocks.SKELETON_SKULL, Blocks.WITHER_SKELETON_SKULL, Blocks.ZOMBIE_HEAD, Blocks.CREEPER_HEAD
+    };
     private static final int HEAD_CYCLE_TICKS = 40;
 
-    transient Multiblock multiblockObj;
-    transient GuiButton visualizeButton;
-    private final transient Set<TileEntity> erroredTiles = Collections.newSetFromMap(new WeakHashMap<>());
+    private transient AbstractMultiblock multiblockObj;
+    private transient Button visualizeButton;
+    // Hold errored BEs weakly, this may cause some dupe errors but will prevent spamming it every frame.
+    private final transient Set<BlockEntity> erroredTiles = Collections.newSetFromMap(new WeakHashMap<>());
 
     @Override
-    public void build(BookEntry entry, int pageNum) {
-        super.build(entry, pageNum);
-        if (this.multiblockId != null && !this.multiblockId.isEmpty()) {
-            IMultiblock mb = MultiblockRegistry.MULTIBLOCKS.get(new ResourceLocation(this.multiblockId));
-            if (mb instanceof Multiblock) {
-                this.multiblockObj = (Multiblock) mb;
+    public void build(Level level, BookEntry entry, BookContentsBuilder builder, int pageNum) {
+        super.build(level, entry, builder, pageNum);
+        if (this.multiblockId != null) {
+            IMultiblock mb = MultiblockRegistry.MULTIBLOCKS.get(this.multiblockId);
+            if (mb instanceof AbstractMultiblock abstractMultiblock) {
+                this.multiblockObj = abstractMultiblock;
             }
         }
         if (this.multiblockObj == null && this.serializedMultiblock != null) {
@@ -108,8 +128,7 @@ public class PageBuildGuide extends PageWithText {
     public void onDisplayed(GuiBookEntry parent, int left, int top) {
         super.onDisplayed(parent, left, top);
         if (this.showVisualizeButton) {
-            this.visualizeButton = new GuiButtonBookEye(parent, 12, 97);
-            this.addButton(this.visualizeButton);
+            this.addButton(this.visualizeButton = new GuiButtonBookEye(parent, 12, 97, this::handleButtonVisualize));
         }
     }
 
@@ -119,194 +138,155 @@ public class PageBuildGuide extends PageWithText {
     }
 
     @Override
-    public void render(int mouseX, int mouseY, float pticks) {
-        int x = 5;
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float pticks) {
+        int x = GuiBook.PAGE_WIDTH / 2 - 53;
         int y = 7;
-        GlStateManager.enableBlend();
-        GlStateManager.color(1.0F, 1.0F, 1.0F);
-        GuiBook.drawFromTexture(this.book, x, y, 405, 149, 106, 106);
-        this.parent.drawCenteredStringNoShadow(this.name, 58, 0, this.book.headerColor);
+        RenderSystem.enableBlend();
+        graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
+        GuiBook.drawFromTexture(graphics, this.book, x, y, 405, 149, 106, 106);
+        this.parent.drawCenteredStringNoShadow(graphics, this.i18n(this.name),
+                GuiBook.PAGE_WIDTH / 2, 0, this.book.headerColor);
         if (this.multiblockObj != null) {
-            this.renderMultiblock();
+            this.renderMultiblock(graphics);
         }
-        super.render(mouseX, mouseY, pticks);
+        super.render(graphics, mouseX, mouseY, pticks);
     }
 
-    @Override
-    protected void onButtonClicked(GuiButton button) {
-        if (button == this.visualizeButton) {
-            String entryKey = this.parent.getEntry().getResource().toString();
-            PersistentData.DataHolder.BookData.Bookmark bookmark =
-                    new PersistentData.DataHolder.BookData.Bookmark(entryKey, this.pageNum / 2);
-            MultiblockVisualizationHandler.setMultiblock(this.multiblockObj, this.name, bookmark, true);
-            this.parent.addBookmarkButtons();
-            if (!PersistentData.data.clickedVisualize) {
-                PersistentData.data.clickedVisualize = true;
-                PersistentData.save();
-            }
+    public void handleButtonVisualize(Button button) {
+        ResourceLocation entryKey = this.parent.getEntry().getId();
+        Bookmark bookmark = new Bookmark(entryKey, this.pageNum / 2);
+        MultiblockVisualizationHandler.setMultiblock(this.multiblockObj, this.i18nText(this.name), bookmark, true);
+        this.parent.addBookmarkButtons();
+        if (!PersistentData.data.clickedVisualize) {
+            PersistentData.data.clickedVisualize = true;
+            PersistentData.save();
         }
     }
 
-    private void renderMultiblock() {
+    private void renderMultiblock(GuiGraphics graphics) {
+        this.multiblockObj.setWorld(this.mc.level);
+        Vec3i size = this.multiblockObj.getSize();
+        int sizeX = size.getX();
+        int sizeY = size.getY();
+        int sizeZ = size.getZ();
         float maxX = 90.0F;
         float maxY = 90.0F;
-        float diag = (float) Math.sqrt(this.multiblockObj.sizeX * this.multiblockObj.sizeX
-                + this.multiblockObj.sizeZ * this.multiblockObj.sizeZ);
-        float height = this.multiblockObj.sizeY;
+        float diag = (float) Math.sqrt(sizeX * sizeX + sizeZ * sizeZ);
         float scaleX = maxX / diag;
-        float scaleY = maxY / height;
+        float scaleY = maxY / sizeY;
         float scale = -Math.min(scaleX, scaleY) * this.scaleMod;
-        float xPos = 58.0F + this.offsetX;
+
+        float xPos = GuiBook.PAGE_WIDTH / 2.0F + this.offsetX;
         float yPos = 60.0F + this.offsetY;
-        GlStateManager.pushMatrix();
-        GlStateManager.translate(xPos, yPos, 100.0F);
-        GlStateManager.scale(scale, scale, scale);
-        GlStateManager.translate(-((float) this.multiblockObj.sizeX) / 2.0F,
-                -((float) this.multiblockObj.sizeY) / 2.0F, 0.0F);
+        graphics.pose().pushPose();
+        graphics.pose().translate(xPos, yPos, 100.0F);
+        graphics.pose().scale(scale, scale, scale);
+        graphics.pose().translate(-(float) sizeX / 2.0F, -(float) sizeY / 2.0F, 0.0F);
+
+        // Initial eye pos somewhere off in the distance in the -Z direction.
         Vector4f eye = new Vector4f(0.0F, 0.0F, -100.0F, 1.0F);
         Matrix4f rotMat = new Matrix4f();
-        rotMat.setIdentity();
-        GlStateManager.rotate(-30.0F, 1.0F, 0.0F, 0.0F);
-        rotMat.rotX((float) Math.toRadians(30.0));
-        float offX = (float) (-this.multiblockObj.sizeX) / 2.0F;
-        float offZ = (float) (-this.multiblockObj.sizeZ) / 2.0F + 1.0F;
+        rotMat.identity();
+
+        // For each rotation done, track the opposite to keep the eye pos accurate.
+        graphics.pose().mulPose(Axis.XP.rotationDegrees(-30.0F));
+        rotMat.rotation(Axis.XP.rotationDegrees(30.0F));
+
+        float offX = (float) -sizeX / 2.0F;
+        float offZ = (float) -sizeZ / 2.0F + 1.0F;
+
         float time = this.parent.ticksInBook * 0.5F;
-        if (!GuiScreen.isShiftKeyDown()) {
+        if (!Screen.hasShiftDown()) {
             time += ClientTicker.partialTicks;
         }
-        GlStateManager.translate(-offX, 0.0F, -offZ);
-        GlStateManager.rotate(time, 0.0F, 1.0F, 0.0F);
-        rotMat.rotY((float) Math.toRadians(-time));
-        GlStateManager.rotate(45.0F, 0.0F, 1.0F, 0.0F);
-        rotMat.rotY((float) Math.toRadians(-45.0));
-        GlStateManager.translate(offX, 0.0F, offZ);
-        rotMat.transform(eye);
-        this.renderElements(this.multiblockObj,
-                BlockPos.getAllInBoxMutable(BlockPos.ORIGIN, new BlockPos(this.multiblockObj.sizeX - 1,
-                        this.multiblockObj.sizeY - 1, this.multiblockObj.sizeZ - 1)), eye);
-        GlStateManager.popMatrix();
+        graphics.pose().translate(-offX, 0.0F, -offZ);
+        graphics.pose().mulPose(Axis.YP.rotationDegrees(time));
+        rotMat.rotation(Axis.YP.rotationDegrees(-time));
+        graphics.pose().mulPose(Axis.YP.rotationDegrees(45.0F));
+        rotMat.rotation(Axis.YP.rotationDegrees(-45.0F));
+        graphics.pose().translate(offX, 0.0F, offZ);
+
+        eye.mul(rotMat);
+        this.renderElements(graphics, this.multiblockObj,
+                BlockPos.betweenClosed(BlockPos.ZERO, new BlockPos(sizeX - 1, sizeY - 1, sizeZ - 1)), eye);
+
+        graphics.pose().popPose();
     }
 
-    private void renderElements(Multiblock mb, Iterable<? extends BlockPos> blocks, Vector4f eye) {
-        GlStateManager.pushMatrix();
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        GlStateManager.translate(0.0F, 0.0F, -1.0F);
-        TileEntityRendererDispatcher.instance.entityX = eye.x;
-        TileEntityRendererDispatcher.instance.entityY = eye.y;
-        TileEntityRendererDispatcher.instance.entityZ = eye.z;
-        TileEntityRendererDispatcher.staticPlayerX = eye.x;
-        TileEntityRendererDispatcher.staticPlayerY = eye.y;
-        TileEntityRendererDispatcher.staticPlayerZ = eye.z;
-        BlockRenderLayer oldRenderLayer = MinecraftForgeClient.getRenderLayer();
-        for (BlockRenderLayer layer : BlockRenderLayer.values()) {
-            if (layer == BlockRenderLayer.TRANSLUCENT) {
-                this.doTileEntityRenderPass(mb, blocks, 0);
-            }
-            this.doWorldRenderPass(mb, blocks, layer, eye);
-            if (layer == BlockRenderLayer.TRANSLUCENT) {
-                this.doTileEntityRenderPass(mb, blocks, 1);
-            }
-        }
-        ForgeHooksClient.setRenderLayer(oldRenderLayer);
-        ForgeHooksClient.setRenderPass(-1);
-        this.setGlStateForPass(0);
-        this.mc.getTextureManager().getTexture(TextureMap.LOCATION_BLOCKS_TEXTURE).restoreLastBlurMipmap();
-        GlStateManager.popMatrix();
+    private void renderElements(GuiGraphics graphics, AbstractMultiblock mb, Iterable<? extends BlockPos> blocks, Vector4f eye) {
+        graphics.pose().pushPose();
+        graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
+        graphics.pose().translate(0.0F, 0.0F, -1.0F);
+
+        MultiBufferSource.BufferSource buffers = Minecraft.getInstance().renderBuffers().bufferSource();
+        this.doWorldRenderPass(graphics, mb, blocks, buffers);
+        this.doTileEntityRenderPass(graphics, mb, blocks, buffers);
+
+        buffers.endBatch();
+        graphics.pose().popPose();
     }
 
-    private void doWorldRenderPass(Multiblock mb, Iterable<? extends BlockPos> blocks, BlockRenderLayer layer, Vector4f eye) {
-        this.mc.renderEngine.bindTexture(TextureMap.LOCATION_BLOCKS_TEXTURE);
-        this.mc.getTextureManager().getTexture(TextureMap.LOCATION_BLOCKS_TEXTURE).setBlurMipmap(false, false);
-        ForgeHooksClient.setRenderLayer(layer);
-        this.setGlStateForPass(layer);
-        BufferBuilder wr = Tessellator.getInstance().getBuffer();
-        wr.begin(7, DefaultVertexFormats.BLOCK);
+    private void doWorldRenderPass(GuiGraphics graphics, AbstractMultiblock mb, Iterable<? extends BlockPos> blocks,
+            MultiBufferSource.BufferSource buffers) {
         for (BlockPos pos : blocks) {
-            IBlockState bs = mb.getBlockState(pos);
-            Block block = bs.getBlock();
-            if (!block.canRenderInLayer(bs = bs.getActualState(mb, pos), layer)) {
-                continue;
-            }
-            this.renderBlock(bs, pos, mb, Tessellator.getInstance().getBuffer());
-        }
-        if (layer == BlockRenderLayer.TRANSLUCENT) {
-            wr.sortVertexData(eye.x, eye.y, eye.z);
-        }
-        Tessellator.getInstance().draw();
-    }
+            BlockState bs = mb.getBlockState(pos);
+            graphics.pose().pushPose();
+            graphics.pose().translate(pos.getX(), pos.getY(), pos.getZ());
 
-    private void renderBlock(IBlockState state, BlockPos pos, Multiblock mb, BufferBuilder buffer) {
-        try {
-            BlockRendererDispatcher brd = this.mc.getBlockRendererDispatcher();
-            EnumBlockRenderType type = state.getRenderType();
-            if (type != EnumBlockRenderType.MODEL) {
-                brd.renderBlock(state, pos, mb, buffer);
-                return;
+            FluidState fluidState = bs.getFluidState();
+            BlockRenderDispatcher blockRenderer = Minecraft.getInstance().getBlockRenderer();
+            if (!fluidState.isEmpty()) {
+                RenderType layer = ItemBlockRenderTypes.getRenderLayer(fluidState);
+                VertexConsumer buffer = buffers.getBuffer(layer);
+                blockRenderer.renderLiquid(pos, mb, new LiquidBlockVertexConsumer(buffer, graphics.pose(), pos), bs, fluidState);
             }
-            IBakedModel model = brd.getModelForState(state);
-            state = state.getBlock().getExtendedState(state, mb, pos);
-            brd.getBlockModelRenderer().renderModel(mb, model, state, pos, buffer, false);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            IClientXplatAbstractions.INSTANCE.renderForMultiblock(bs, pos, mb, graphics.pose(), buffers, PageBuildGuide.RAND);
+            graphics.pose().popPose();
         }
     }
 
-    private void doTileEntityRenderPass(Multiblock mb, Iterable<? extends BlockPos> blocks, int pass) {
-        mb.setWorld(this.mc.world);
-        ForgeHooksClient.setRenderPass(1);
+    private void doTileEntityRenderPass(GuiGraphics graphics, AbstractMultiblock mb, Iterable<? extends BlockPos> blocks,
+            MultiBufferSource buffers) {
         for (BlockPos pos : blocks) {
-            TileEntity te = mb.getTileEntity(pos);
-            BlockPos relPos = new BlockPos(this.mc.player);
-            if (te == null || this.erroredTiles.contains(te) || !te.shouldRenderInPass(pass)) {
-                continue;
-            }
-            // Re-establish a clean render state before EACH tile entity. A preceding TESR (the
-            // chest golem stacks a chest's TileEntityChestRenderer below the skull) leaves blend,
-            // culling, lighting and color altered, which made the skull on top render opaque
-            // instead of matching the translucent preview the way every other golem's skull does.
-            // Resetting per-iteration makes all skulls render identically regardless of neighbours.
-            RenderHelper.enableStandardItemLighting();
-            GlStateManager.enableLighting();
-            // The negative scale in renderMultiblock() flips face winding; with culling on, a TESR
-            // skull's front faces get culled and you see into the hollow interior. Render both faces
-            // (depth still keeps the nearest) so heads render solid.
-            GlStateManager.disableCull();
-            this.setGlStateForPass(1);
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-            te.setWorld(this.mc.world);
-            te.setPos(relPos.add(pos));
-            if (this.cycleHeads && te instanceof TileEntitySkull) {
-                int idx = (this.parent.ticksInBook / HEAD_CYCLE_TICKS) % HEAD_TYPES.length;
-                ((TileEntitySkull) te).setType(HEAD_TYPES[idx]);
-            }
-            try {
-                TileEntityRendererDispatcher.instance.render(te, pos.getX(), pos.getY(), pos.getZ(),
-                        ClientTicker.partialTicks);
-            } catch (Exception e) {
-                this.erroredTiles.add(te);
-                e.printStackTrace();
+            BlockEntity te = mb.getBlockEntity(pos);
+            if (te != null && !this.erroredTiles.contains(te)) {
+                te.setLevel(this.mc.level);
+
+                // Fake cached state in case the renderer checks it, as we don't want to query the actual
+                // world. This is also where the head cycle happens: SkullBlockRenderer reads the head type
+                // off the block entity's cached block state, so handing it a cycled skull state is the
+                // 1.20.1 equivalent of 1.12.2's TileEntitySkull.setType().
+                te.setBlockState(this.displayState(mb.getBlockState(pos)));
+
+                graphics.pose().pushPose();
+                graphics.pose().translate(pos.getX(), pos.getY(), pos.getZ());
+                try {
+                    BlockEntityRenderer<BlockEntity> renderer =
+                            Minecraft.getInstance().getBlockEntityRenderDispatcher().getRenderer(te);
+                    if (renderer != null) {
+                        renderer.render(te, ClientTicker.partialTicks, graphics.pose(), buffers, 0xF000F0, OverlayTexture.NO_OVERLAY);
+                    }
+                } catch (Exception e) {
+                    this.erroredTiles.add(te);
+                    PatchouliAPI.LOGGER.error("An exception occured rendering tile entity", e);
+                } finally {
+                    graphics.pose().popPose();
+                }
             }
         }
-        ForgeHooksClient.setRenderPass(-1);
-        GlStateManager.enableCull();
-        RenderHelper.disableStandardItemLighting();
     }
 
-    private void setGlStateForPass(BlockRenderLayer layer) {
-        int pass = layer == BlockRenderLayer.TRANSLUCENT ? 1 : 0;
-        this.setGlStateForPass(pass);
-    }
-
-    private void setGlStateForPass(int layer) {
-        GlStateManager.color(1.0F, 1.0F, 1.0F);
-        if (layer == 0) {
-            GlStateManager.enableDepth();
-            GlStateManager.disableBlend();
-            GlStateManager.depthMask(true);
-        } else {
-            GlStateManager.enableBlend();
-            GlStateManager.blendFunc(770, 771);
-            GlStateManager.depthMask(false);
+    /// The block state to render, which is the pattern's own state unless the head cycle rewrites it.
+    /// Only floor skulls cycle; a wall skull carries a FACING the floor variants do not have.
+    private BlockState displayState(BlockState state) {
+        if (!this.cycleHeads || !(state.getBlock() instanceof SkullBlock)) {
+            return state;
         }
+        int idx = (this.parent.ticksInBook / PageBuildGuide.HEAD_CYCLE_TICKS) % PageBuildGuide.HEAD_TYPES.length;
+        Block head = PageBuildGuide.HEAD_TYPES[idx];
+        if (head == state.getBlock()) {
+            return state;
+        }
+        return head.defaultBlockState().setValue(SkullBlock.ROTATION, state.getValue(SkullBlock.ROTATION));
     }
 }

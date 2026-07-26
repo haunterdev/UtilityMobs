@@ -1,7 +1,7 @@
 {
   "name": "Ghast Turret",
   "category": "utilitymobs:turrets",
-  "icon": "minecraft:nether_brick",
+  "icon": "minecraft:nether_bricks",
   "sortnum": 5,
   "pages": [
     {
@@ -22,7 +22,7 @@
         "mapping": {
           "D": "minecraft:dispenser",
           "F": "minecraft:nether_brick_fence",
-          "0": "minecraft:nether_brick"
+          "0": "minecraft:nether_bricks"
         }
       },
       "text": "",
@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:ghastturret",
+      "entity": "utilitymobs:ghast_turret",
       "name": "Ghast Turret",
       "text": "Health: 20  Armor: 8$(br)Damage: 6  Range: 10$(br)Shots: 1  Atk speed: 2"
     }

@@ -21,7 +21,7 @@
         ],
         "mapping": {
           "D": "minecraft:dispenser",
-          "F": "minecraft:fence",
+          "F": "minecraft:oak_fence",
           "0": "minecraft:lapis_block"
         }
       },
@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:sniperturret",
+      "entity": "utilitymobs:sniper_turret",
       "name": "Sniper Turret",
       "text": "Health: 20  Armor: 0$(br)Damage: 6  Range: 20$(br)Shots: 1  Atk speed: 2.9"
     }

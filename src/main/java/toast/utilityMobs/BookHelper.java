@@ -1,24 +1,24 @@
 package toast.utilityMobs;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Items;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.nbt.NBTTagString;
-import net.minecraft.util.text.ITextComponent;
-import net.minecraft.util.text.TextComponentString;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 public abstract class BookHelper
 {
     /// Checks the player's book and updates it.
-    public static boolean checkBook(EntityPlayer player) {
-        ItemStack held = player.getHeldItemMainhand();
-        if (held.isEmpty() || held.getTagCompound() == null || held.getItem() != Items.WRITTEN_BOOK && held.getItem() != Items.WRITABLE_BOOK)
+    public static boolean checkBook(Player player) {
+        ItemStack held = player.getMainHandItem();
+        if (held.isEmpty() || held.getTag() == null || held.getItem() != Items.WRITTEN_BOOK && held.getItem() != Items.WRITABLE_BOOK)
             return false;
-        if (held.getTagCompound().hasKey("umt")) {
-            TargetHelper.write(player.getName(), held, held.getTagCompound().getByte("umt"));
+        if (held.getTag().contains("umt")) {
+            TargetHelper.write(player.getScoreboardName(), held, held.getTag().getByte("umt"));
             // Mark the freshly-written pages as known so the save-on-exit tick treats them as the
             // baseline rather than a player edit.
             TargetHelper.stampSignature(held);
@@ -28,44 +28,36 @@ public abstract class BookHelper
     }
 
     /// Called when a player right clicks a living entity. If this returns true, the event is canceled.
-    public static boolean interact(EntityPlayer player, EntityLivingBase entity) {
-        ItemStack held = player.getHeldItemMainhand();
-        if (held.isEmpty() || held.getTagCompound() == null || held.getItem() != Items.WRITTEN_BOOK && held.getItem() != Items.WRITABLE_BOOK || !held.getTagCompound().hasKey("umt"))
+    public static boolean interact(Player player, LivingEntity entity) {
+        ItemStack held = player.getMainHandItem();
+        if (held.isEmpty() || held.getTag() == null || held.getItem() != Items.WRITTEN_BOOK && held.getItem() != Items.WRITABLE_BOOK || !held.getTag().contains("umt"))
             return false;
-        if (player.world.isRemote) {
-            TargetHelper.interact(player.getName(), held, held.getTagCompound().getByte("umt"), entity, player.isSneaking());
+        if (player.level().isClientSide) {
+            TargetHelper.interact(player.getScoreboardName(), held, held.getTag().getByte("umt"), entity, player.isShiftKeyDown());
         }
         return true;
     }
 
     /// Sets the book's title and author.
     public static ItemStack setTitleAndAuthor(ItemStack book, String title, String author) {
-        if (book.getTagCompound() == null) {
-            book.setTagCompound(new NBTTagCompound());
-        }
-        book.getTagCompound().setString("title", title);
-        book.getTagCompound().setString("author", author);
+        CompoundTag tag = book.getOrCreateTag();
+        tag.putString("title", title);
+        tag.putString("author", author);
         return book;
     }
     public static ItemStack setTitle(ItemStack book, String title) {
-        if (book.getTagCompound() == null) {
-            book.setTagCompound(new NBTTagCompound());
-        }
-        book.getTagCompound().setString("title", title);
+        book.getOrCreateTag().putString("title", title);
         return book;
     }
     public static ItemStack setAuthor(ItemStack book, String author) {
-        if (book.getTagCompound() == null) {
-            book.setTagCompound(new NBTTagCompound());
-        }
-        book.getTagCompound().setString("author", author);
+        book.getOrCreateTag().putString("author", author);
         return book;
     }
 
     /// Removes all pages from a book.
     public static ItemStack removePages(ItemStack book) {
-        if (book.getTagCompound() != null && book.getTagCompound().hasKey("pages")) {
-            book.getTagCompound().removeTag("pages");
+        if (book.getTag() != null && book.getTag().contains("pages")) {
+            book.getTag().remove("pages");
         }
         return book;
     }
@@ -73,19 +65,17 @@ public abstract class BookHelper
     /// Adds new pages to a book.
     public static ItemStack addPages(ItemStack book, String... pages) {
         if (pages.length > 0) {
-            if (book.getTagCompound() == null) {
-                book.setTagCompound(new NBTTagCompound());
+            CompoundTag bookTag = book.getOrCreateTag();
+            if (!bookTag.contains("pages", Tag.TAG_LIST)) {
+                bookTag.put("pages", new ListTag());
             }
-            if (!book.getTagCompound().hasKey("pages")) {
-                book.getTagCompound().setTag("pages", new NBTTagList());
-            }
-            NBTTagList tag = book.getTagCompound().getTagList("pages", new NBTTagString("").getId());
-            // Written (signed) books require each page to be a JSON text component string in 1.12.2;
+            ListTag tag = bookTag.getList("pages", Tag.TAG_STRING);
+            // Written (signed) books require each page to be a JSON text component string;
             // writable (book & quill) pages stay as plain strings.
             boolean written = book.getItem() == Items.WRITTEN_BOOK;
-            for (int p = 0; p < pages.length; p++) if (pages[p] != null) {
-                String content = written ? ITextComponent.Serializer.componentToJson(new TextComponentString(pages[p])) : pages[p];
-                tag.appendTag(new NBTTagString(content));
+            for (String page : pages) if (page != null) {
+                String content = written ? Component.Serializer.toJson(Component.literal(page)) : page;
+                tag.add(StringTag.valueOf(content));
             }
         }
         return book;

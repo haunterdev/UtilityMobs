@@ -1,35 +1,55 @@
 package toast.utilityMobs.golem;
 
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.EntityAIWander;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Blocks;
-import net.minecraft.inventory.IInventory;
-import net.minecraft.inventory.ItemStackHelper;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.network.datasync.DataParameter;
-import net.minecraft.network.datasync.DataSerializers;
-import net.minecraft.network.datasync.EntityDataManager;
-import net.minecraft.tileentity.TileEntityFurnace;
-import net.minecraft.util.EnumHand;
-import net.minecraft.util.NonNullList;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import java.util.EnumSet;
+
+import net.minecraft.core.NonNullList;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
+import net.minecraft.world.Container;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraftforge.common.ForgeHooks;
 import toast.utilityMobs.TargetHelper;
 import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.ai.EntityAIGolemTarget;
 import toast.utilityMobs.ai.EntityAIWeaponAttack;
 import toast.utilityMobs.network.GuiHelper;
 
-public class EntitySteamGolem extends EntityLargeGolem implements IInventory
+public class EntitySteamGolem extends EntityLargeGolem implements Container, net.minecraft.world.MenuProvider
 {
+    /// Server side of opening this golem's screen. 1.12.2 routed this through IGuiHandler; 1.20.1 wants
+    /// the entity itself to be the MenuProvider. getDisplayName is inherited from Entity.
+    @Override
+    public net.minecraft.world.inventory.AbstractContainerMenu createMenu(int containerId, net.minecraft.world.entity.player.Inventory playerInv, Player player) {
+        return new ContainerSteamGolem(containerId, playerInv, this);
+    }
+
     /// The texture for this class.
-    public static final ResourceLocation[] TEXTURES = { new ResourceLocation(_UtilityMobs.TEXTURE + "golem/steamgolem.png"), new ResourceLocation(_UtilityMobs.TEXTURE + "golem/steamgolem_fire.png") };
+    public static final ResourceLocation[] TEXTURES = {
+        new ResourceLocation(_UtilityMobs.TEXTURE + "golem/steamgolem.png"),
+        new ResourceLocation(_UtilityMobs.TEXTURE + "golem/steamgolem_fire.png")
+    };
 
     /// The number of ticks that the furnace will keep burning.
     public int burnTime = 0;
@@ -37,85 +57,89 @@ public class EntitySteamGolem extends EntityLargeGolem implements IInventory
     public int maxBurnTime = 0;
 
     /// burningState; While this is 1, the golem will be in its "on" state.
-    private static final DataParameter<Byte> BURNING = EntityDataManager.createKey(EntitySteamGolem.class, DataSerializers.BYTE);
+    private static final EntityDataAccessor<Byte> BURNING = SynchedEntityData.defineId(EntitySteamGolem.class, EntityDataSerializers.BYTE);
 
     // The contents of this furnace.
     private NonNullList<ItemStack> contents;
 
-    public EntitySteamGolem(World world) {
-        super(world);
+    // Registered entity size: 1.4 x 2.9 (set via EntityType.Builder.sized at registration).
+    public EntitySteamGolem(EntityType<? extends EntitySteamGolem> type, Level level) {
+        super(type, level);
         this.texture = EntitySteamGolem.TEXTURES[0];
-        this.contents = NonNullList.withSize(this.getSizeInventory(), ItemStack.EMPTY);
-        this.tasks.addTask(1, this.sitAI);
-        this.sitAI.setMutexBits(7);
-        this.sitAI.sitAnywhere = true;
-        this.tasks.addTask(2, new EntityAIWeaponAttack(this, 1.0));
-        this.tasks.addTask(3, new toast.utilityMobs.ai.EntityAIGolemWander(this, 0.6));
-        this.targetTasks.addTask(1, new EntityAIGolemTarget(this));
+        this.contents = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
+    }
+
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+        this.goalSelector.addGoal(1, this.sitAI());
+        this.sitAI().setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK, Goal.Flag.JUMP));
+        this.sitAI().sitAnywhere = true;
+        this.goalSelector.addGoal(2, new EntityAIWeaponAttack(this, 1.0));
+        this.goalSelector.addGoal(3, new toast.utilityMobs.ai.EntityAIGolemWander(this, 0.6));
+        this.targetSelector.addGoal(1, new EntityAIGolemTarget(this));
     }
 
     /// Initializes this entity's attributes.
-    @Override
-    protected void applyEntityAttributes() {
-        super.applyEntityAttributes();
-        this.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).setBaseValue(40.0);
-        this.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).setBaseValue(0.25);
-        this.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE).setBaseValue(7.0);
+    public static AttributeSupplier.Builder createAttributes() {
+        return EntityLargeGolem.createAttributes()
+            .add(Attributes.MOVEMENT_SPEED, 0.25)
+            .add(Attributes.ATTACK_DAMAGE, 7.0);
     }
 
     /// Returns the armor of this entity.
     @Override
-    public int getTotalArmorValue() {
-        return Math.min(20, super.getTotalArmorValue() + 2);
+    public int getArmorValue() {
+        return Math.min(20, super.getArmorValue() + 2);
     }
 
-    /// Used to initialize data manager variables.
+    // Used to initialize data manager variables.
     @Override
-    protected void entityInit() {
-        super.entityInit();
-        this.dataManager.register(BURNING, Byte.valueOf((byte)0));
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(BURNING, Byte.valueOf((byte)0));
     }
 
     /// Gets/sets this steam golem's burningState variable. Used for rendering.
     public boolean getBurningState() {
-        return this.dataManager.get(BURNING).byteValue() == 1;
+        return this.entityData.get(BURNING).byteValue() == 1;
     }
     public void setBurningState(boolean state) {
-        this.dataManager.set(BURNING, Byte.valueOf(state ? (byte)1 : (byte)0));
+        this.entityData.set(BURNING, Byte.valueOf(state ? (byte)1 : (byte)0));
     }
 
     @Override
     protected Item getDropItem() {
-        return Item.getItemFromBlock(Blocks.FURNACE);
+        return Items.FURNACE;
     }
 
     @Override
     protected void dropFewItems(boolean recentlyHit, int looting, float dropChance) {
-        if (this.rand.nextInt(2) == 0) {
-            this.dropItem(this.getDropItem(), 1);
+        if (this.random.nextInt(2) == 0) {
+            this.spawnAtLocation(this.getDropItem());
         }
-        for (int i = 0; i < this.getSizeInventory(); i++) {
+        for (int i = 0; i < this.getContainerSize(); i++) {
             ItemStack stack = this.contents.get(i);
             if (!stack.isEmpty()) {
                 ItemStack split = stack.copy();
                 while (stack.getCount() > 0) {
-                    int splitSize = this.rand.nextInt(21) + 10;
+                    int splitSize = this.random.nextInt(21) + 10;
                     if (splitSize > stack.getCount()) {
                         splitSize = stack.getCount();
                     }
                     stack.shrink(splitSize);
                     split.setCount(splitSize);
-                    this.entityDropItem(split.copy(), 0.0F);
+                    this.spawnAtLocation(split.copy(), 0.0F);
                 }
                 this.contents.set(i, ItemStack.EMPTY);
             }
         }
     }
 
-    // ---- IInventory implementation ----
+    // ---- Container implementation ----
 
     @Override
-    public int getSizeInventory() {
+    public int getContainerSize() {
         return 3;
     }
 
@@ -129,106 +153,69 @@ public class EntitySteamGolem extends EntityLargeGolem implements IInventory
     }
 
     @Override
-    public ItemStack getStackInSlot(int slot) {
+    public ItemStack getItem(int slot) {
         return this.contents.get(slot);
     }
 
     @Override
-    public ItemStack decrStackSize(int slot, int amount) {
-        return ItemStackHelper.getAndSplit(this.contents, slot, amount);
+    public ItemStack removeItem(int slot, int amount) {
+        return ContainerHelper.removeItem(this.contents, slot, amount);
     }
 
     @Override
-    public ItemStack removeStackFromSlot(int slot) {
-        return ItemStackHelper.getAndRemove(this.contents, slot);
+    public ItemStack removeItemNoUpdate(int slot) {
+        return ContainerHelper.takeItem(this.contents, slot);
     }
 
     @Override
-    public void setInventorySlotContents(int slot, ItemStack itemStack) {
+    public void setItem(int slot, ItemStack itemStack) {
         this.contents.set(slot, itemStack);
-        if (!itemStack.isEmpty() && itemStack.getCount() > this.getInventoryStackLimit()) {
-            itemStack.setCount(this.getInventoryStackLimit());
+        if (!itemStack.isEmpty() && itemStack.getCount() > this.getMaxStackSize()) {
+            itemStack.setCount(this.getMaxStackSize());
         }
     }
 
     @Override
-    public String getName() {
-        // Return the entity's lang KEY (not a literal) when unnamed, so the GUI title - drawn via
-        // I18n.format(getName()) - is localizable and follows resource-pack/lang overrides. Reuses the
-        // existing entity name key so there is one source of truth for the display name.
-        return this.hasCustomName() ? this.getCustomNameTag() : "entity.SteamGolem.name";
-    }
-
-    // NOTE: do NOT override hasCustomName() to always-true. It is shared with Entity, and forcing
-    // it true makes the hover label render an empty getCustomNameTag() (a small black sliver above
-    // the head). Inherit Entity's real value; getName() above still supplies the GUI/inventory title.
-
-    @Override
-    public int getInventoryStackLimit() {
+    public int getMaxStackSize() {
         return 64;
     }
 
     @Override
-    public boolean isUsableByPlayer(EntityPlayer player) {
+    public boolean stillValid(Player player) {
         return this.canInteract(player);
     }
 
     @Override
-    public void openInventory(EntityPlayer player) {
-        // Do nothing
+    public boolean canPlaceItem(int slot, ItemStack itemStack) {
+        return AbstractFurnaceBlockEntity.isFuel(itemStack);
     }
 
     @Override
-    public void closeInventory(EntityPlayer player) {
-        // Do nothing
-    }
-
-    @Override
-    public boolean isItemValidForSlot(int slot, ItemStack itemStack) {
-        return TileEntityFurnace.isItemFuel(itemStack);
-    }
-
-    @Override
-    public int getField(int id) {
-        return 0;
-    }
-
-    @Override
-    public void setField(int id, int value) {
-        // No fields
-    }
-
-    @Override
-    public int getFieldCount() {
-        return 0;
-    }
-
-    @Override
-    public void clear() {
+    public void clearContent() {
         for (int i = 0; i < this.contents.size(); i++) {
             this.contents.set(i, ItemStack.EMPTY);
         }
     }
 
     @Override
-    public void markDirty() {
+    public void setChanged() {
         // Do nothing
     }
 
     // ---- Interaction ----
 
     @Override
-    public boolean processInteract(EntityPlayer player, EnumHand hand) {
-        if (this.canInteract(player) && !player.isSneaking()) {
+    public InteractionResult mobInteract(Player player, InteractionHand hand) {
+        if (this.canInteract(player) && !player.isShiftKeyDown()) {
             if (this.openGUI(player))
-                return true;
+                return InteractionResult.sidedSuccess(this.level().isClientSide);
         }
-        return super.processInteract(player, hand);
+        return super.mobInteract(player, hand);
     }
 
     /// Opens this golem's GUI.
-    public boolean openGUI(EntityPlayer player) {
-        if (!this.world.isRemote) {
+    public boolean openGUI(Player player) {
+        if (!this.level().isClientSide) {
             GuiHelper.displayGUICustom(player, this);
         }
         return true;
@@ -241,9 +228,9 @@ public class EntitySteamGolem extends EntityLargeGolem implements IInventory
 
     /// Called each tick this entity exists.
     @Override
-    public void onUpdate() {
-        super.onUpdate();
-        if (this.world.isRemote) {
+    public void tick() {
+        super.tick();
+        if (this.level().isClientSide) {
             this.texture = this.getBurningState() ? EntitySteamGolem.TEXTURES[1] : EntitySteamGolem.TEXTURES[0];
             if (this.getBurningState()) {
                 this.spawnFurnaceFX();
@@ -252,51 +239,51 @@ public class EntitySteamGolem extends EntityLargeGolem implements IInventory
     }
 
     /// Emits the lit-furnace fire crackle + flame/smoke particles from the golem's furnace face while
-    /// powered (issue #8). Mirrors vanilla BlockFurnace.randomDisplayTick exactly - one flame + one smoke
-    /// per tick and a 10% chance of the crackle sound - so the rate and volume match a real lit furnace.
-    /// Called only from the client branch of onUpdate; every API used here is common-side (no-ops server).
+    /// powered. Mirrors vanilla FurnaceBlock.animateTick exactly - one flame + one smoke per tick and a
+    /// 10% chance of the crackle sound - so the rate and volume match a real lit furnace.
+    /// Called only from the client branch of tick; every API used here is common-side (no-ops server).
     private void spawnFurnaceFX() {
-        float yaw = this.renderYawOffset * ((float) Math.PI / 180.0F);
-        double forwardX = -net.minecraft.util.math.MathHelper.sin(yaw);
-        double forwardZ = net.minecraft.util.math.MathHelper.cos(yaw);
+        float yaw = this.yBodyRot * ((float)Math.PI / 180.0F);
+        double forwardX = -Mth.sin(yaw);
+        double forwardZ = Mth.cos(yaw);
         // Chest/furnace face: half the body height up, pushed out to the front of the model.
-        double faceX = this.posX + forwardX * 0.55D;
-        double faceY = this.posY + this.height * 0.5D;
-        double faceZ = this.posZ + forwardZ * 0.55D;
+        double faceX = this.getX() + forwardX * 0.55;
+        double faceY = this.getY() + this.getBbHeight() * 0.5;
+        double faceZ = this.getZ() + forwardZ * 0.55;
         // Spread sideways across the face (perpendicular to facing) and a little vertically.
-        double side = (this.rand.nextDouble() - 0.5D) * 0.6D;
+        double side = (this.random.nextDouble() - 0.5) * 0.6;
         double px = faceX + forwardZ * side;
         double pz = faceZ - forwardX * side;
-        double py = faceY + (this.rand.nextDouble() - 0.3D) * 0.4D;
-        if (this.rand.nextDouble() < 0.1D) {
-            this.world.playSound(this.posX, this.posY, this.posZ, net.minecraft.init.SoundEvents.BLOCK_FURNACE_FIRE_CRACKLE,
-                net.minecraft.util.SoundCategory.BLOCKS, 1.0F, 1.0F, false);
+        double py = faceY + (this.random.nextDouble() - 0.3) * 0.4;
+        if (this.random.nextDouble() < 0.1) {
+            this.level().playLocalSound(this.getX(), this.getY(), this.getZ(), SoundEvents.FURNACE_FIRE_CRACKLE,
+                SoundSource.BLOCKS, 1.0F, 1.0F, false);
         }
-        this.world.spawnParticle(net.minecraft.util.EnumParticleTypes.SMOKE_NORMAL, px, py, pz, 0.0D, 0.0D, 0.0D);
-        this.world.spawnParticle(net.minecraft.util.EnumParticleTypes.FLAME, px, py, pz, 0.0D, 0.0D, 0.0D);
+        this.level().addParticle(ParticleTypes.SMOKE, px, py, pz, 0.0, 0.0, 0.0);
+        this.level().addParticle(ParticleTypes.FLAME, px, py, pz, 0.0, 0.0, 0.0);
     }
 
     /// Called each tick this entity is alive.
     @Override
-    public void onLivingUpdate() {
+    public void aiStep() {
         if (this.burnTime > 0) {
             this.burnTime--;
         }
-        if (!this.world.isRemote) {
+        if (!this.level().isClientSide) {
             // Burn fuel from whichever slot holds it. We consume in place rather than shuffling fuel
             // into a fixed "burn" slot every tick - that old per-tick swap both made placed fuel jump
             // to the middle slot and mutated the open inventory mid-interaction, which desynced the GUI
             // and could visually dupe the stack. Now fuel stays exactly where the player put it.
             if (this.burnTime == 0) {
                 for (int slot = 0; slot < this.contents.size(); slot++) {
-                    ItemStack fuel = this.getStackInSlot(slot);
-                    int burn = TileEntityFurnace.getItemBurnTime(fuel);
+                    ItemStack fuel = this.getItem(slot);
+                    int burn = ForgeHooks.getBurnTime(fuel, RecipeType.SMELTING);
                     if (!fuel.isEmpty() && burn > 0) {
                         this.maxBurnTime = this.burnTime = burn;
-                        ItemStack container = fuel.getItem().getContainerItem(fuel);
+                        Item container = fuel.getItem().getCraftingRemainingItem();
                         fuel.shrink(1);
                         if (fuel.isEmpty()) {
-                            this.setInventorySlotContents(slot, container);
+                            this.setItem(slot, container == null ? ItemStack.EMPTY : new ItemStack(container));
                         }
                         break;
                     }
@@ -306,51 +293,49 @@ public class EntitySteamGolem extends EntityLargeGolem implements IInventory
             if (this.getBurningState() != burnState) {
                 this.setBurningState(burnState);
             }
-            this.sitAI.sit = !burnState;
+            this.sitAI().sit = !burnState;
 
             // Auto-close the GUI for any viewer who has walked too far away (mirrors vanilla horse/llama
             // inventories, which close past ~8 blocks). Without this the menu could stay open on a golem
-            // that wandered off (issue #6).
-            for (net.minecraft.entity.player.EntityPlayer viewer : this.world.playerEntities) {
-                if (viewer.openContainer instanceof ContainerSteamGolem
-                        && ((ContainerSteamGolem)viewer.openContainer).getGolem() == this
-                        && (!this.isEntityAlive() || this.getDistanceSq(viewer) > 64.0D)) {
-                    viewer.closeScreen();
+            // that wandered off.
+            for (Player viewer : this.level().players()) {
+                if (viewer.containerMenu instanceof ContainerSteamGolem menu
+                        && menu.getGolem() == this
+                        && (!this.isAlive() || this.distanceToSqr(viewer) > 64.0)) {
+                    viewer.closeContainer();
                 }
             }
         }
-        super.onLivingUpdate();
+        super.aiStep();
     }
 
-    /// Saves this entity to NBT.
     @Override
-    public void writeEntityToNBT(NBTTagCompound tag) {
-        super.writeEntityToNBT(tag);
-        NBTTagList tagList = new NBTTagList();
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        ListTag tagList = new ListTag();
         for (int slot = 0; slot < this.contents.size(); slot++) {
             if (!this.contents.get(slot).isEmpty()) {
-                NBTTagCompound slotTag = new NBTTagCompound();
-                slotTag.setByte("Slot", (byte)slot);
-                this.contents.get(slot).writeToNBT(slotTag);
-                tagList.appendTag(slotTag);
+                CompoundTag slotTag = new CompoundTag();
+                slotTag.putByte("Slot", (byte)slot);
+                this.contents.get(slot).save(slotTag);
+                tagList.add(slotTag);
             }
         }
-        tag.setTag("Items", tagList);
-        tag.setShort("BurnTime", (short)this.burnTime);
-        tag.setShort("MaxBurnTime", (short)this.maxBurnTime);
+        tag.put("Items", tagList);
+        tag.putShort("BurnTime", (short)this.burnTime);
+        tag.putShort("MaxBurnTime", (short)this.maxBurnTime);
     }
 
-    /// Loads this entity from NBT.
     @Override
-    public void readEntityFromNBT(NBTTagCompound tag) {
-        super.readEntityFromNBT(tag);
-        NBTTagList tagList = tag.getTagList("Items", new NBTTagCompound().getId());
-        this.contents = NonNullList.withSize(this.getSizeInventory(), ItemStack.EMPTY);
-        for (int i = 0; i < tagList.tagCount(); i++) {
-            NBTTagCompound slotTag = tagList.getCompoundTagAt(i);
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        ListTag tagList = tag.getList("Items", Tag.TAG_COMPOUND);
+        this.contents = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < tagList.size(); i++) {
+            CompoundTag slotTag = tagList.getCompound(i);
             int slot = slotTag.getByte("Slot") & 255;
             if (slot >= 0 && slot < this.contents.size()) {
-                this.contents.set(slot, new ItemStack(slotTag));
+                this.contents.set(slot, ItemStack.of(slotTag));
             }
         }
         this.burnTime = tag.getShort("BurnTime");
@@ -358,7 +343,6 @@ public class EntitySteamGolem extends EntityLargeGolem implements IInventory
     }
 
     // Returns an integer between 0 and the passed value representing how much burn time is left on the current fuel.
-    @SideOnly(Side.CLIENT)
     public int getBurnTimeRemainingScaled(int max) {
         if (this.maxBurnTime == 0) {
             this.maxBurnTime = 200;

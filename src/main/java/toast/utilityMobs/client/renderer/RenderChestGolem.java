@@ -1,22 +1,20 @@
 package toast.utilityMobs.client.renderer;
 
-import net.minecraft.client.renderer.entity.RenderLiving;
-import net.minecraft.client.renderer.entity.RenderManager;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.MobRenderer;
+import net.minecraft.resources.ResourceLocation;
+import toast.utilityMobs.block.EntityChestGolem;
+import toast.utilityMobs.client.ClientSetup;
 import toast.utilityMobs.client.model.ModelChestGolem;
-import toast.utilityMobs.golem.EntityUtilityGolem;
 
-@SideOnly(Side.CLIENT)
-public class RenderChestGolem extends RenderLiving<EntityUtilityGolem>
+public class RenderChestGolem extends MobRenderer<EntityChestGolem, ModelChestGolem>
 {
-    public RenderChestGolem(RenderManager renderManager) {
-        super(renderManager, new ModelChestGolem(), 0.5F);
+    public RenderChestGolem(EntityRendererProvider.Context ctx) {
+        super(ctx, new ModelChestGolem(ctx.bakeLayer(ClientSetup.CHEST_GOLEM_LAYER)), 0.5F);
     }
 
     @Override
-    protected ResourceLocation getEntityTexture(EntityUtilityGolem entity) {
+    public ResourceLocation getTextureLocation(EntityChestGolem entity) {
         return entity.getTexture();
     }
 }

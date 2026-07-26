@@ -21,7 +21,7 @@
         ],
         "mapping": {
           "D": "minecraft:dispenser",
-          "F": "minecraft:fence",
+          "F": "minecraft:oak_fence",
           "0": "minecraft:redstone_block"
         }
       },
@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:fireturret",
+      "entity": "utilitymobs:fire_turret",
       "name": "Fire Turret",
       "text": "Health: 20  Armor: 0$(br)Damage: 4  Range: 10$(br)Shots: 1  Atk speed: 3.3"
     }

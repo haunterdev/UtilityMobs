@@ -20,7 +20,7 @@
           ]
         ],
         "mapping": {
-          "P": "minecraft:pumpkin[facing=north]",
+          "P": "minecraft:carved_pumpkin[facing=north]",
           "S": "minecraft:soul_sand",
           "0": "minecraft:soul_sand"
         }
@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:boundsoul",
+      "entity": "utilitymobs:bound_soul",
       "name": "Bound Soul",
       "text": "Health: 20  Armor: equipped armor$(br)Damage: equipped weapon (1 unarmed)  Speed: 3"
     },

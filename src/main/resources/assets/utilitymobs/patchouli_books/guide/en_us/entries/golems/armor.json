@@ -20,7 +20,7 @@
           ]
         ],
         "mapping": {
-          "P": "minecraft:pumpkin[facing=north]",
+          "P": "minecraft:carved_pumpkin[facing=north]",
           "I": "minecraft:iron_block",
           "0": "minecraft:iron_block"
         }
@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:armorgolem",
+      "entity": "utilitymobs:armor_golem",
       "name": "Armor Golem",
       "offset": 0.12,
       "text": "Health: 40  Armor: 15$(br)Damage: 7  Speed: 2.8"

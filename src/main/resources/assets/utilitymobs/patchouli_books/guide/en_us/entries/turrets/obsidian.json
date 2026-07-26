@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:obsidianturret",
+      "entity": "utilitymobs:obsidian_turret",
       "name": "Obsidian Turret",
       "text": "Health: 100  Armor: 20$(br)Damage: 4  Range: 10$(br)Shots: 1  Atk speed: 3.3"
     }

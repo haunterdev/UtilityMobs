@@ -1,6 +1,6 @@
 {
   "name": "Golems",
   "description": "Walking helpers built from blocks and a pumpkin.",
-  "icon": "minecraft:pumpkin",
+  "icon": "minecraft:carved_pumpkin",
   "sortnum": 1
 }

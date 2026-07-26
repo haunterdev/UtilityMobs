@@ -1,99 +1,109 @@
 package toast.utilityMobs.client;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
-import io.netty.buffer.Unpooled;
+import org.lwjgl.glfw.GLFW;
 
+import net.minecraft.ChatFormatting;
+import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.gui.GuiScreen;
-import net.minecraft.client.gui.GuiScreenBook;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Items;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.nbt.NBTTagString;
-import net.minecraft.network.PacketBuffer;
-import net.minecraft.network.play.client.CPacketCustomPayload;
-import net.minecraft.util.ChatAllowedCharacters;
-import net.minecraft.util.EnumHand;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.text.TextFormatting;
-import net.minecraftforge.client.event.GuiOpenEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-
-import org.lwjgl.input.Keyboard;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.BookEditScreen;
+import net.minecraft.client.gui.screens.inventory.BookViewScreen;
+import net.minecraft.client.gui.screens.inventory.PageButton;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ServerboundEditBookPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraftforge.client.event.ScreenEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 /**
-    A deliberately small book editor for the Utility Mobs target-list books. Vanilla's GuiScreenBook
-    only appends/backspaces at the end of a page with no cursor, so you cannot edit an earlier line
-    without deleting everything after it. This screen adds a movable text cursor - Left/Right/Up/Down,
-    Home/End, plus insert/delete at the cursor - so individual lines can be edited in place. It keeps
-    everything else minimal: pages are split on '\n' and drawn line-by-line (the list entries are short
-    ids that never need word-wrap), and the edited book is pushed to the server when the screen closes
-    (ESC or Done), which our save-on-exit tick then parses.
-
-    Installed by swapping out vanilla's GuiScreenBook via {@link OpenHandler} whenever the player opens
-    a writable target book (one carrying the "umt" tag). Registered in ClientProxy.
+ * A deliberately small book editor for the Utility Mobs target-list books. Vanilla's book editor
+ * only appends/backspaces at the end of a page with no cursor, so you cannot edit an earlier line
+ * without deleting everything after it. This screen adds a movable text cursor - Left/Right/Up/Down,
+ * Home/End, plus insert/delete at the cursor - so individual lines can be edited in place. It keeps
+ * everything else minimal: pages are split on '\n' and drawn line-by-line (the list entries are short
+ * ids that never need word-wrap), and the edited book is pushed to the server when the screen closes
+ * (ESC or Done), which our save-on-exit tick then parses.
+ *
+ * <p>Installed by swapping out vanilla's BookEditScreen via {@link OpenHandler} whenever the player
+ * opens a writable target book (one carrying the "umt" tag). Registered in {@link ClientSetup}.
+ *
+ * <p>Two 1.20.1 changes show through. 1.12.2 shipped the page text as an NBT list inside a hand-built
+ * "MC|BEdit" custom payload; ServerboundEditBookPacket now carries the pages as plain strings and an
+ * inventory slot, so the pages are held as a String list and the packet does the rest - the server
+ * rewrites only the "pages" tag, leaving our "umt" data intact exactly as the old payload did. And the
+ * page-turn arrows no longer need a hand-drawn button: vanilla's PageButton is public and draws from
+ * the same book texture the 1.12.2 inner class blitted by hand.
  */
-public class GuiTargetBookEditor extends GuiScreen {
+public class GuiTargetBookEditor extends Screen {
 
-    private static final ResourceLocation BOOK_TEXTURES = new ResourceLocation("textures/gui/book.png");
     private static final int IMG_W = 192;
     private static final int MAX_PAGE_CHARS = 256;
     private static final int TEXT_LEFT_PAD = 36;
     private static final int TEXT_TOP = 34;
     private static final int TEXT_WIDTH = 116;
 
-    private final EntityPlayer editingPlayer;
+    private final Player editingPlayer;
     private final ItemStack book;
-    private NBTTagList pages;
+    private final InteractionHand hand;
+    private final List<String> pages = new ArrayList<String>();
     private int currPage;
     private int cursor;
     private int updateCount;
     private boolean modified;
 
-    private GuiButton buttonDone;
-    private GuiButton buttonNext;
-    private GuiButton buttonPrev;
+    private Button buttonNext;
+    private Button buttonPrev;
 
-    public GuiTargetBookEditor(EntityPlayer player, ItemStack book) {
+    public GuiTargetBookEditor(Player player, ItemStack book, InteractionHand hand) {
+        super(Component.empty());
         this.editingPlayer = player;
         this.book = book;
-        if (book.hasTagCompound() && book.getTagCompound().hasKey("pages")) {
-            this.pages = book.getTagCompound().getTagList("pages", new NBTTagString("").getId()).copy();
+        this.hand = hand;
+        if (book.getTag() != null && book.getTag().contains("pages")) {
+            ListTag list = book.getTag().getList("pages", Tag.TAG_STRING);
+            for (int i = 0; i < list.size(); i++) {
+                this.pages.add(list.getString(i));
+            }
         }
-        if (this.pages == null || this.pages.tagCount() < 1) {
-            this.pages = new NBTTagList();
-            this.pages.appendTag(new NBTTagString(""));
+        if (this.pages.isEmpty()) {
+            this.pages.add("");
         }
         this.cursor = this.page().length();
     }
 
     @Override
-    public void initGui() {
-        this.buttonList.clear();
-        Keyboard.enableRepeatEvents(true);
-        int i = (this.width - IMG_W) / 2;
-        this.buttonDone = this.addButton(new GuiButton(0, this.width / 2 - 100, 196, 200, 20, I18n.format("gui.done")));
-        this.buttonNext = this.addButton(new PageButton(1, i + 120, 156, true));
-        this.buttonPrev = this.addButton(new PageButton(2, i + 38, 156, false));
+    protected void init() {
+        int i = (this.width - GuiTargetBookEditor.IMG_W) / 2;
+        this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> this.onClose())
+                .bounds(this.width / 2 - 100, 196, 200, 20).build());
+        this.buttonNext = this.addRenderableWidget(new PageButton(i + 120, 156, true, b -> this.nextPage(), true));
+        this.buttonPrev = this.addRenderableWidget(new PageButton(i + 38, 156, false, b -> this.prevPage(), true));
         this.updateButtons();
     }
 
     @Override
-    public void updateScreen() {
-        super.updateScreen();
+    public void tick() {
+        super.tick();
         ++this.updateCount;
     }
 
     @Override
-    public void onGuiClosed() {
-        Keyboard.enableRepeatEvents(false);
+    public void removed() {
         // Save on exit (ESC or Done both route here), matching the rest of the target book flow.
         this.sendBookToServer();
     }
@@ -103,26 +113,21 @@ public class GuiTargetBookEditor extends GuiScreen {
         this.buttonPrev.visible = this.currPage > 0;
     }
 
-    @Override
-    protected void actionPerformed(GuiButton button) throws IOException {
-        if (!button.enabled)
-            return;
-        if (button.id == 0) {
-            this.mc.displayGuiScreen(null); // triggers onGuiClosed -> save
+    private void nextPage() {
+        if (this.currPage < this.pages.size() - 1) {
+            this.currPage++;
         }
-        else if (button.id == 1) {
-            if (this.currPage < this.pages.tagCount() - 1) {
-                this.currPage++;
-            }
-            else if (this.pages.tagCount() < 50) {
-                this.pages.appendTag(new NBTTagString(""));
-                this.currPage++;
-                this.modified = true;
-            }
-            this.cursor = this.page().length();
-            this.updateButtons();
+        else if (this.pages.size() < 50) {
+            this.pages.add("");
+            this.currPage++;
+            this.modified = true;
         }
-        else if (button.id == 2 && this.currPage > 0) {
+        this.cursor = this.page().length();
+        this.updateButtons();
+    }
+
+    private void prevPage() {
+        if (this.currPage > 0) {
             this.currPage--;
             this.cursor = this.page().length();
             this.updateButtons();
@@ -132,12 +137,12 @@ public class GuiTargetBookEditor extends GuiScreen {
     // --- page text helpers -------------------------------------------------
 
     private String page() {
-        return this.currPage >= 0 && this.currPage < this.pages.tagCount() ? this.pages.getStringTagAt(this.currPage) : "";
+        return this.currPage >= 0 && this.currPage < this.pages.size() ? this.pages.get(this.currPage) : "";
     }
 
     private void setPage(String text) {
-        if (this.currPage >= 0 && this.currPage < this.pages.tagCount()) {
-            this.pages.set(this.currPage, new NBTTagString(text));
+        if (this.currPage >= 0 && this.currPage < this.pages.size()) {
+            this.pages.set(this.currPage, text);
             this.modified = true;
         }
     }
@@ -184,7 +189,7 @@ public class GuiTargetBookEditor extends GuiScreen {
     private List<int[]> buildRows(String[] lines) {
         List<int[]> rows = new ArrayList<int[]>();
         for (int ll = 0; ll < lines.length; ll++) {
-            this.wrapLine(lines[ll], TEXT_WIDTH, ll, rows);
+            this.wrapLine(lines[ll], GuiTargetBookEditor.TEXT_WIDTH, ll, rows);
         }
         return rows;
     }
@@ -204,7 +209,7 @@ public class GuiTargetBookEditor extends GuiScreen {
             int lastSpace = -1;
             while (end < len) {
                 char ch = line.charAt(end);
-                int cw = this.fontRenderer.getCharWidth(ch);
+                int cw = this.font.width(String.valueOf(ch));
                 if (w + cw > width && end > start)
                     break;
                 w += cw;
@@ -232,7 +237,7 @@ public class GuiTargetBookEditor extends GuiScreen {
             if (row[0] != line)
                 continue;
             if (col >= row[1] && col <= row[1] + row[2]) {
-                return new int[] { r, this.fontRenderer.getStringWidth(lines[line].substring(row[1], col)) };
+                return new int[] { r, this.font.width(lines[line].substring(row[1], col)) };
             }
         }
         return new int[] { Math.max(0, rows.size() - 1), 0 };
@@ -240,7 +245,7 @@ public class GuiTargetBookEditor extends GuiScreen {
 
     private void insert(String text) {
         String s = this.page();
-        if (s.length() + text.length() > MAX_PAGE_CHARS)
+        if (s.length() + text.length() > GuiTargetBookEditor.MAX_PAGE_CHARS)
             return;
         this.setPage(s.substring(0, this.cursor) + text + s.substring(this.cursor));
         this.cursor += text.length();
@@ -248,80 +253,92 @@ public class GuiTargetBookEditor extends GuiScreen {
 
     // --- input -------------------------------------------------------------
 
+    /**
+     * 1.12.2 handled navigation, editing and typing in one keyTyped. 1.20.1 splits them: keyPressed sees
+     * key codes (so the arrows/Home/End/Backspace/Delete/Enter live here) and charTyped sees the typed
+     * character (so plain text insertion lives there). The behaviour of each branch is unchanged.
+     */
     @Override
-    protected void keyTyped(char typedChar, int keyCode) throws IOException {
-        super.keyTyped(typedChar, keyCode); // ESC closes (then onGuiClosed saves)
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         String s = this.page();
         switch (keyCode) {
-            case Keyboard.KEY_LEFT:
+            case GLFW.GLFW_KEY_LEFT:
                 this.cursor = Math.max(0, this.cursor - 1);
-                return;
-            case Keyboard.KEY_RIGHT:
+                return true;
+            case GLFW.GLFW_KEY_RIGHT:
                 this.cursor = Math.min(s.length(), this.cursor + 1);
-                return;
-            case Keyboard.KEY_UP: {
+                return true;
+            case GLFW.GLFW_KEY_UP: {
                 int[] lc = this.lineColOf(s, this.cursor);
                 if (lc[0] > 0)
                     this.cursor = this.indexOf(s, lc[0] - 1, lc[1]);
-                return;
+                return true;
             }
-            case Keyboard.KEY_DOWN: {
+            case GLFW.GLFW_KEY_DOWN: {
                 int[] lc = this.lineColOf(s, this.cursor);
                 if (lc[0] < this.lineCount(s) - 1)
                     this.cursor = this.indexOf(s, lc[0] + 1, lc[1]);
-                return;
+                return true;
             }
-            case Keyboard.KEY_HOME: {
+            case GLFW.GLFW_KEY_HOME: {
                 int[] lc = this.lineColOf(s, this.cursor);
                 this.cursor = this.indexOf(s, lc[0], 0);
-                return;
+                return true;
             }
-            case Keyboard.KEY_END: {
+            case GLFW.GLFW_KEY_END: {
                 int[] lc = this.lineColOf(s, this.cursor);
                 this.cursor = this.indexOf(s, lc[0], Integer.MAX_VALUE);
-                return;
+                return true;
             }
-            case Keyboard.KEY_BACK:
+            case GLFW.GLFW_KEY_BACKSPACE:
                 if (this.cursor > 0) {
                     this.setPage(s.substring(0, this.cursor - 1) + s.substring(this.cursor));
                     this.cursor--;
                 }
-                return;
-            case Keyboard.KEY_DELETE:
+                return true;
+            case GLFW.GLFW_KEY_DELETE:
                 if (this.cursor < s.length()) {
                     this.setPage(s.substring(0, this.cursor) + s.substring(this.cursor + 1));
                 }
-                return;
-            case Keyboard.KEY_RETURN:
-            case Keyboard.KEY_NUMPADENTER:
+                return true;
+            case GLFW.GLFW_KEY_ENTER:
+            case GLFW.GLFW_KEY_KP_ENTER:
                 this.insert("\n");
-                return;
+                return true;
             default:
                 break;
         }
-        if (GuiScreen.isKeyComboCtrlV(keyCode)) {
-            this.insert(GuiScreen.getClipboardString());
+        if (Screen.isPaste(keyCode)) {
+            this.insert(this.minecraft.keyboardHandler.getClipboard());
+            return true;
         }
-        else if (ChatAllowedCharacters.isAllowedCharacter(typedChar)) {
+        return super.keyPressed(keyCode, scanCode, modifiers); // ESC closes (then removed() saves)
+    }
+
+    @Override
+    public boolean charTyped(char typedChar, int modifiers) {
+        if (SharedConstants.isAllowedChatCharacter(typedChar)) {
             this.insert(Character.toString(typedChar));
+            return true;
         }
+        return false;
     }
 
     // --- rendering ---------------------------------------------------------
 
     @Override
-    public void drawScreen(int mouseX, int mouseY, float partialTicks) {
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        this.mc.getTextureManager().bindTexture(BOOK_TEXTURES);
-        int i = (this.width - IMG_W) / 2;
-        this.drawTexturedModalRect(i, 2, 0, 0, IMG_W, IMG_W);
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
+        int i = (this.width - GuiTargetBookEditor.IMG_W) / 2;
+        graphics.blit(BookViewScreen.BOOK_LOCATION, i, 2, 0, 0, GuiTargetBookEditor.IMG_W, GuiTargetBookEditor.IMG_W);
 
-        String indicator = I18n.format("book.pageIndicator", this.currPage + 1, this.pages.tagCount());
-        this.fontRenderer.drawString(indicator, i - this.fontRenderer.getStringWidth(indicator) + IMG_W - 44, 18, 0);
+        String indicator = I18n.get("book.pageIndicator", this.currPage + 1, this.pages.size());
+        graphics.drawString(this.font, indicator,
+                i - this.font.width(indicator) + GuiTargetBookEditor.IMG_W - 44, 18, 0, false);
 
         String s = this.page();
-        int textLeft = i + TEXT_LEFT_PAD;
-        int fh = this.fontRenderer.FONT_HEIGHT;
+        int textLeft = i + GuiTargetBookEditor.TEXT_LEFT_PAD;
+        int fh = this.font.lineHeight;
         String[] lines = s.split("\n", -1);
         // Wrap each logical line to the page width so prose pages don't run off the edge. Each row is
         // {logicalLine, colStart, length}; wrapping preserves every character so cursor indices stay exact.
@@ -329,79 +346,60 @@ public class GuiTargetBookEditor extends GuiScreen {
 
         for (int r = 0; r < rows.size(); r++) {
             int[] row = rows.get(r);
-            this.fontRenderer.drawString(lines[row[0]].substring(row[1], row[1] + row[2]), textLeft, TEXT_TOP + r * fh, 0);
+            graphics.drawString(this.font, lines[row[0]].substring(row[1], row[1] + row[2]),
+                    textLeft, GuiTargetBookEditor.TEXT_TOP + r * fh, 0, false);
         }
 
         // Blinking cursor at its wrapped row + column.
         if (this.updateCount / 6 % 2 == 0) {
             int[] pos = this.cursorVisualPos(lines, rows); // {rowIndex, pixelX}
-            this.fontRenderer.drawString(TextFormatting.BLACK + "_", textLeft + pos[1], TEXT_TOP + pos[0] * fh, 0);
+            graphics.drawString(this.font, ChatFormatting.BLACK + "_",
+                    textLeft + pos[1], GuiTargetBookEditor.TEXT_TOP + pos[0] * fh, 0, false);
         }
 
-        super.drawScreen(mouseX, mouseY, partialTicks);
+        super.render(graphics, mouseX, mouseY, partialTicks);
     }
 
     // --- networking --------------------------------------------------------
 
     private void sendBookToServer() {
-        if (!this.modified || this.pages == null)
+        if (!this.modified)
             return;
-        // Trim trailing empty pages, mirroring vanilla GuiScreenBook.
-        while (this.pages.tagCount() > 1 && this.pages.getStringTagAt(this.pages.tagCount() - 1).isEmpty()) {
-            this.pages.removeTag(this.pages.tagCount() - 1);
+        // Trim trailing empty pages, mirroring vanilla's book editor.
+        while (this.pages.size() > 1 && this.pages.get(this.pages.size() - 1).isEmpty()) {
+            this.pages.remove(this.pages.size() - 1);
         }
-        if (this.book.hasTagCompound()) {
-            this.book.getTagCompound().setTag("pages", this.pages);
+        // Keep the local copy in step so the held stack shows the edit before the server echoes back.
+        ListTag list = new ListTag();
+        for (String text : this.pages) {
+            list.add(StringTag.valueOf(text));
         }
-        else {
-            this.book.setTagInfo("pages", this.pages);
-        }
+        this.book.addTagElement("pages", list);
         try {
-            PacketBuffer buf = new PacketBuffer(Unpooled.buffer());
-            buf.writeItemStack(this.book);
-            this.mc.getConnection().sendPacket(new CPacketCustomPayload("MC|BEdit", buf));
+            int slot = this.hand == InteractionHand.MAIN_HAND
+                ? this.editingPlayer.getInventory().selected : Inventory.SLOT_OFFHAND;
+            Minecraft.getInstance().getConnection().getConnection()
+                .send(new ServerboundEditBookPacket(slot, this.pages, Optional.empty()));
         }
         catch (Exception ex) {
-            ex.printStackTrace();
-        }
-    }
-
-    /** Book-style page-turn arrow, drawn from the book texture (matches vanilla's look). */
-    static class PageButton extends GuiButton {
-        private final boolean forward;
-
-        PageButton(int id, int x, int y, boolean forward) {
-            super(id, x, y, 23, 13, "");
-            this.forward = forward;
-        }
-
-        @Override
-        public void drawButton(Minecraft mc, int mouseX, int mouseY, float partialTicks) {
-            if (!this.visible)
-                return;
-            boolean hover = mouseX >= this.x && mouseY >= this.y && mouseX < this.x + this.width && mouseY < this.y + this.height;
-            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-            mc.getTextureManager().bindTexture(BOOK_TEXTURES);
-            int u = hover ? 23 : 0;
-            int v = this.forward ? 192 : 205;
-            this.drawTexturedModalRect(this.x, this.y, u, v, 23, 13);
+            toast.utilityMobs._UtilityMobs.debugException("Could not send the edited target book: " + ex.getMessage());
         }
     }
 
     /** Swaps vanilla's book editor for this cursor-capable one when a writable target book is opened. */
     public static class OpenHandler {
         @SubscribeEvent
-        public void onGuiOpen(GuiOpenEvent event) {
-            if (!(event.getGui() instanceof GuiScreenBook))
+        public void onScreenOpening(ScreenEvent.Opening event) {
+            if (!(event.getScreen() instanceof BookEditScreen))
                 return;
-            Minecraft mc = Minecraft.getMinecraft();
+            Minecraft mc = Minecraft.getInstance();
             if (mc.player == null)
                 return;
-            for (EnumHand hand : EnumHand.values()) {
-                ItemStack held = mc.player.getHeldItem(hand);
-                if (!held.isEmpty() && held.getItem() == Items.WRITABLE_BOOK
-                        && held.getTagCompound() != null && held.getTagCompound().hasKey("umt")) {
-                    event.setGui(new GuiTargetBookEditor(mc.player, held));
+            for (InteractionHand hand : InteractionHand.values()) {
+                ItemStack held = mc.player.getItemInHand(hand);
+                if (!held.isEmpty() && held.is(Items.WRITABLE_BOOK)
+                        && held.getTag() != null && held.getTag().contains("umt")) {
+                    event.setNewScreen(new GuiTargetBookEditor(mc.player, held, hand));
                     return;
                 }
             }

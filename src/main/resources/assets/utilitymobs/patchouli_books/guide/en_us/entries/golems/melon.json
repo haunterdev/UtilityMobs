@@ -1,7 +1,7 @@
 {
   "name": "Melon Golem",
   "category": "utilitymobs:golems",
-  "icon": "minecraft:melon_block",
+  "icon": "minecraft:melon",
   "sortnum": 1,
   "pages": [
     {
@@ -20,9 +20,9 @@
           ]
         ],
         "mapping": {
-          "P": "minecraft:pumpkin[facing=north]",
-          "M": "minecraft:melon_block",
-          "0": "minecraft:melon_block"
+          "P": "minecraft:carved_pumpkin[facing=north]",
+          "M": "minecraft:melon",
+          "0": "minecraft:melon"
         }
       },
       "text": "",
@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:melongolem",
+      "entity": "utilitymobs:melon_golem",
       "name": "Melon Golem",
       "text": "Health: 4  Armor: 0$(br)Damage: 0  Speed: 2"
     },

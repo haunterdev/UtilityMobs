@@ -1,64 +1,61 @@
 package toast.utilityMobs.client;
 
-import java.io.IOException;
-
-import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.gui.inventory.GuiContainer;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.util.ResourceLocation;
-import toast.utilityMobs.GuideBook;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Inventory;
 import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.golem.ContainerSteamGolem;
-import toast.utilityMobs.golem.EntitySteamGolem;
 
-public class GuiSteamGolem extends GuiContainer {
+/**
+ * The steam golem's fuel screen, with the furnace flame drawn from its synced burn timer.
+ *
+ */
+public class GuiSteamGolem extends AbstractContainerScreen<ContainerSteamGolem> {
 
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.MODID, "textures/gui/guisteamgolem.png");
-    private EntitySteamGolem steamGolem;
 
-    public GuiSteamGolem(InventoryPlayer player, EntitySteamGolem golem) {
-        super(new ContainerSteamGolem(player, golem));
-        this.steamGolem = golem;
+    public GuiSteamGolem(ContainerSteamGolem menu, Inventory inventory, Component title) {
+        super(menu, inventory, title);
     }
 
     @Override
-    public void initGui() {
-        super.initGui();
-        // Help button (top-right) - opens the Patchouli guide book. Hidden when general.show_help_button is false.
-        if (toast.utilityMobs.Properties.getBoolean(toast.utilityMobs.Properties.GENERAL, "show_help_button")) {
-            this.buttonList.add(new GuiBorderedButton(90, this.guiLeft + this.xSize - 20, this.guiTop + 4, 16, 16, "?"));
+    protected void init() {
+        super.init();
+        // Help button (top-right) - opens the Patchouli guide book, same gate as the other golem GUIs.
+        if (toast.utilityMobs.GuideBook.showHelpButton()) {
+            this.addRenderableWidget(HelpButton.build(this.leftPos + this.imageWidth - 20, this.topPos + 4, 16,
+                b -> toast.utilityMobs.GuideBook.openClient(),
+                Component.translatable("utilitymobs.gui.help"),
+                Component.translatable("utilitymobs.gui.help.desc")));
         }
     }
 
     @Override
-    protected void actionPerformed(GuiButton button) throws IOException {
-        if (button.id == 90) {
-            vazkii.patchouli.api.PatchouliAPI.instance.openBookGUI(GuideBook.BOOK_RL);
-            return;
-        }
-        super.actionPerformed(button);
+    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
+        graphics.drawString(this.font, this.title, this.imageWidth / 2 - this.font.width(this.title) / 2, 6, 4210752, false);
+        graphics.drawString(this.font, this.playerInventoryTitle, 8, this.imageHeight - 96 + 2, 4210752, false);
     }
 
     @Override
-    protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
-        String s = this.steamGolem.hasCustomName() ? this.steamGolem.getName() : I18n.format(this.steamGolem.getName());
-        this.fontRenderer.drawString(s, this.xSize / 2 - this.fontRenderer.getStringWidth(s) / 2, 6, 4210752);
-        this.fontRenderer.drawString(I18n.format("container.inventory"), 8, this.ySize - 96 + 2, 4210752);
+    protected void renderBg(GuiGraphics graphics, float partialTicks, int mouseX, int mouseY) {
+        int x = (this.width - this.imageWidth) / 2;
+        int y = (this.height - this.imageHeight) / 2;
+        graphics.blit(GuiSteamGolem.TEXTURE, x, y, 0, 0, this.imageWidth, this.imageHeight);
+
+        int burnTime = this.menu.getBurnTime();
+        if (burnTime > 0) {
+            int maxBurnTime = this.menu.getMaxBurnTime();
+            int fireSize = burnTime * 13 / (maxBurnTime == 0 ? 200 : maxBurnTime);
+            graphics.blit(GuiSteamGolem.TEXTURE, x + 80, y + 27 + 12 - fireSize, 176, 12 - fireSize, 14, fireSize + 1);
+        }
     }
 
     @Override
-    protected void drawGuiContainerBackgroundLayer(float partialTicks, int mouseX, int mouseY) {
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        this.mc.getTextureManager().bindTexture(GuiSteamGolem.TEXTURE);
-        int x = (this.width - this.xSize) / 2;
-        int y = (this.height - this.ySize) / 2;
-        this.drawTexturedModalRect(x, y, 0, 0, this.xSize, this.ySize);
-
-        if (this.steamGolem.getBurningState()) {
-            int fireSize = this.steamGolem.getBurnTimeRemainingScaled(13);
-            this.drawTexturedModalRect(x + 80, y + 27 + 12 - fireSize, 176, 12 - fireSize, 14, fireSize + 1);
-        }
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        this.renderBackground(graphics);
+        super.render(graphics, mouseX, mouseY, partialTicks);
+        this.renderTooltip(graphics, mouseX, mouseY);
     }
 }

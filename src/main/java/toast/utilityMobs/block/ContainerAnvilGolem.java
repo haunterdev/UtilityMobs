@@ -1,67 +1,75 @@
 package toast.utilityMobs.block;
 
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.inventory.ContainerRepair;
-import net.minecraft.inventory.IInventory;
-import net.minecraft.inventory.Slot;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AnvilMenu;
+import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.item.ItemStack;
 
-public class ContainerAnvilGolem extends ContainerRepair
+/**
+ * An anvil opened against an anvil golem instead of a block.
+ *
+ * <p>Most of 1.12.2's version has been absorbed by vanilla. Its ContainerAnvilGolemSlot existed only
+ * to re-implement the result slot's take behaviour and its private repair-material count, and its
+ * updateRepairOutput override only recomputed that same private field. 1.20.1's AnvilMenu exposes
+ * both (repairItemCountCost, getCost) and its own result slot already does the take logic, so all
+ * that is left is redirecting the anvil's chance of chipping onto the golem.
+ *
+ * <p>The access is NULL on purpose: it makes the inherited take handler skip the block-damage branch
+ * it would otherwise run against whatever block happens to sit at the golem's position, leaving the
+ * golem damage below as the only thing that happens.
+ */
+public class ContainerAnvilGolem extends AnvilMenu
 {
+    /// The chance per use that the anvil chips, as in 1.12.2 and vanilla.
+    private static final float BREAK_CHANCE = 0.12F;
+
     // The golem being crafted on.
     public final EntityAnvilGolem golem;
-    // The two slots where you put the items in that you want to merge and/or rename.
-    public IInventory inputSlots;
-    // Determined by damage of input item and stackSize of repair materials.
-    public int stackSizeToBeUsedInRepair;
 
-    public ContainerAnvilGolem(InventoryPlayer inventory, EntityAnvilGolem anvil, EntityPlayer player) {
-        super(inventory, anvil.world, new BlockPos(-1, -1, -1), player);
+    public ContainerAnvilGolem(int containerId, Inventory inventory, EntityAnvilGolem anvil) {
+        super(containerId, inventory, ContainerLevelAccess.NULL);
         this.golem = anvil;
-        this.golem.openInventory(player);
-        this.inputSlots = this.inventorySlots.get(0).inventory;
-        Slot oldSlot = this.inventorySlots.get(2);
-        Slot newSlot = new ContainerAnvilGolemSlot(this, oldSlot.inventory, oldSlot.getSlotIndex(), oldSlot.xPos, oldSlot.yPos);
-        newSlot.slotNumber = oldSlot.slotNumber;
-        this.inventorySlots.set(2, newSlot);
+        this.golem.startOpen(inventory.player);
     }
 
     @Override
-    public void onContainerClosed(EntityPlayer player) {
-        super.onContainerClosed(player);
-        this.golem.closeInventory(player);
+    public void removed(Player player) {
+        super.removed(player);
+        // ItemCombinerMenu.removed hands the input slots back through access.execute(...), and this menu
+        // deliberately uses ContainerLevelAccess.NULL (see the class note), whose execute is a no-op. So
+        // that callback never ran and anything left in the two input slots was destroyed on close.
+        // Returning them here is what 1.12.2 got from ContainerRepair.onContainerClosed -> clearContainer.
+        this.clearContainer(player, this.inputSlots);
+        this.golem.stopOpen(player);
     }
 
     @Override
-    public boolean canInteractWith(EntityPlayer player) {
-        return this.golem.isUsableByPlayer(player);
+    public boolean stillValid(Player player) {
+        return this.golem.stillValid(player);
     }
 
-    // Called when the Anvil Input Slot changes; recomputes the result and the repair material count.
     @Override
-    public void updateRepairOutput() {
-        super.updateRepairOutput();
-        // Update the needlessly private field, stackSizeToBeUsedInRepair.
-        ItemStack itemStack = this.inputSlots.getStackInSlot(0);
-        if (!itemStack.isEmpty()) {
-            ItemStack itemStackTmp = itemStack.copy();
-            ItemStack itemStackToBeUsed = this.inputSlots.getStackInSlot(1);
-            this.stackSizeToBeUsedInRepair = 0;
-            if (!itemStackToBeUsed.isEmpty()) {
-                if (itemStackTmp.isItemStackDamageable() && itemStackTmp.getItem().getIsRepairable(itemStack, itemStackToBeUsed)) {
-                    int itemDamage = Math.min(itemStackTmp.getItemDamage(), itemStackTmp.getMaxDamage() / 4);
-                    if (itemDamage <= 0)
-                        return;
-                    int stackSizeToBeUsed;
-                    for (stackSizeToBeUsed = 0; itemDamage > 0 && stackSizeToBeUsed < itemStackToBeUsed.getCount(); stackSizeToBeUsed++) {
-                        itemStackTmp.setItemDamage(itemStackTmp.getItemDamage() - itemDamage);
-                        itemDamage = Math.min(itemStackTmp.getItemDamage(), itemStackTmp.getMaxDamage() / 4);
-                    }
-                    this.stackSizeToBeUsedInRepair = stackSizeToBeUsed;
-                }
+    protected void onTake(Player player, ItemStack stack) {
+        super.onTake(player, stack);
+        if (this.golem.level().isClientSide)
+            return;
+        BlockPos pos = this.golem.blockPosition();
+        if (!player.getAbilities().instabuild && player.getRandom().nextFloat() < ContainerAnvilGolem.BREAK_CHANCE) {
+            int damage = this.golem.getDamage() + 1;
+            if (damage > 2) {
+                // 1029 destroyed, 1030 used. 1.12.2 called the same two events by their old ids 1020/1021.
+                this.golem.level().levelEvent(1029, pos, 0);
+                this.golem.discard();
             }
+            else {
+                this.golem.level().levelEvent(1030, pos, 0);
+                this.golem.setDamage(damage);
+            }
+        }
+        else {
+            this.golem.level().levelEvent(1030, pos, 0);
         }
     }
 }

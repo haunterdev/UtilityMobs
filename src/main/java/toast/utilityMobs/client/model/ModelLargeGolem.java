@@ -1,95 +1,122 @@
 package toast.utilityMobs.client.model;
 
-import net.minecraft.client.model.ModelBase;
-import net.minecraft.client.model.ModelRenderer;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLivingBase;
-
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeDeformation;
+import net.minecraft.client.model.geom.builders.CubeListBuilder;
+import net.minecraft.client.model.geom.builders.LayerDefinition;
+import net.minecraft.client.model.geom.builders.MeshDefinition;
+import net.minecraft.client.model.geom.builders.PartDefinition;
 import toast.utilityMobs.golem.EntityLargeGolem;
-import toast.utilityMobs.golem.EntityUtilityGolem;
 
-public class ModelLargeGolem extends ModelBase
+public class ModelLargeGolem extends EntityModel<EntityLargeGolem>
 {
-    public ModelRenderer head;
-    public ModelRenderer body;
-    public ModelRenderer armRight;
-    public ModelRenderer armLeft;
-    public ModelRenderer legLeft;
-    public ModelRenderer legRight;
+    /// 1.12.2 passed this as the constructor's second argument, defaulting to -7.0F.
+    private static final float Y_OFFSET = -7.0F;
 
-    public ModelLargeGolem() {
-        this(0.0F);
+    public final ModelPart head;
+    public final ModelPart body;
+    public final ModelPart armRight;
+    public final ModelPart armLeft;
+    public final ModelPart legLeft;
+    public final ModelPart legRight;
+
+    /// Set in setupAnim, consumed in renderToBuffer.
+    private boolean sitting;
+
+    public ModelLargeGolem(ModelPart root) {
+        this.head = root.getChild("head");
+        this.body = root.getChild("body");
+        this.armRight = root.getChild("arm_right");
+        this.armLeft = root.getChild("arm_left");
+        this.legLeft = root.getChild("leg_left");
+        this.legRight = root.getChild("leg_right");
     }
 
-    public ModelLargeGolem(float f) {
-        this(f, -7.0F);
+    public static LayerDefinition createBodyLayer() {
+        MeshDefinition mesh = new MeshDefinition();
+        PartDefinition root = mesh.getRoot();
+        CubeDeformation none = CubeDeformation.NONE;
+
+        root.addOrReplaceChild("head",
+            CubeListBuilder.create()
+                .texOffs(0, 0).addBox(-4.0F, -12.0F, -5.5F, 8.0F, 10.0F, 8.0F, none)
+                .texOffs(24, 0).addBox(-1.0F, -5.0F, -7.5F, 2.0F, 4.0F, 2.0F, none),
+            PartPose.offset(0.0F, Y_OFFSET, -2.0F));
+
+        root.addOrReplaceChild("body",
+            CubeListBuilder.create()
+                .texOffs(0, 40).addBox(-9.0F, -2.0F, -6.0F, 18.0F, 12.0F, 11.0F, none)
+                .texOffs(0, 70).addBox(-4.5F, 10.0F, -3.0F, 9.0F, 5.0F, 6.0F, new CubeDeformation(0.5F)),
+            PartPose.offset(0.0F, Y_OFFSET, 0.0F));
+
+        root.addOrReplaceChild("arm_right",
+            CubeListBuilder.create().texOffs(60, 21).addBox(-13.0F, -2.5F, -3.0F, 4.0F, 30.0F, 6.0F, none),
+            PartPose.offset(0.0F, -7.0F, 0.0F));
+
+        root.addOrReplaceChild("arm_left",
+            CubeListBuilder.create().texOffs(60, 58).addBox(9.0F, -2.5F, -3.0F, 4.0F, 30.0F, 6.0F, none),
+            PartPose.offset(0.0F, -7.0F, 0.0F));
+
+        root.addOrReplaceChild("leg_left",
+            CubeListBuilder.create().texOffs(37, 0).addBox(-3.5F, -3.0F, -3.0F, 6.0F, 16.0F, 5.0F, none),
+            PartPose.offset(-4.0F, 18.0F + Y_OFFSET, 0.0F));
+
+        root.addOrReplaceChild("leg_right",
+            CubeListBuilder.create().mirror().texOffs(60, 0).addBox(-3.5F, -3.0F, -3.0F, 6.0F, 16.0F, 5.0F, none),
+            PartPose.offset(5.0F, 18.0F + Y_OFFSET, 0.0F));
+
+        return LayerDefinition.create(mesh, 128, 128);
     }
 
-    public ModelLargeGolem(float f, float f1) {
-        this.head = new ModelRenderer(this).setTextureSize(128, 128);
-        this.head.setRotationPoint(0.0F, 0.0F + f1, -2F);
-        this.head.setTextureOffset(0, 0).addBox(-4.0F, -12.0F, -5.5F, 8, 10, 8, f);
-        this.head.setTextureOffset(24, 0).addBox(-1.0F, -5.0F, -7.5F, 2, 4, 2, f);
-        this.body = new ModelRenderer(this).setTextureSize(128, 128);
-        this.body.setRotationPoint(0.0F, 0.0F + f1, 0.0F);
-        this.body.setTextureOffset(0, 40).addBox(-9.0F, -2.0F, -6.0F, 18, 12, 11, f);
-        this.body.setTextureOffset(0, 70).addBox(-4.5F, 10.0F, -3.0F, 9, 5, 6, f + 0.5F);
-        this.armRight = new ModelRenderer(this).setTextureSize(128, 128);
-        this.armRight.setRotationPoint(0.0F, -7.0F, 0.0F);
-        this.armRight.setTextureOffset(60, 21).addBox(-13.0F, -2.5F, -3.0F, 4, 30, 6, f);
-        this.armLeft = new ModelRenderer(this).setTextureSize(128, 128);
-        this.armLeft.setRotationPoint(0.0F, -7.0F, 0.0F);
-        this.armLeft.setTextureOffset(60, 58).addBox(9.0F, -2.5F, -3.0F, 4, 30, 6, f);
-        this.legLeft = new ModelRenderer(this, 0, 22).setTextureSize(128, 128);
-        this.legLeft.setRotationPoint(-4.0F, 18.0F + f1, 0.0F);
-        this.legLeft.setTextureOffset(37, 0).addBox(-3.5F, -3.0F, -3.0F, 6, 16, 5, f);
-        this.legRight = new ModelRenderer(this, 0, 22).setTextureSize(128, 128);
-        this.legRight.mirror = true;
-        this.legRight.setTextureOffset(60, 0).setRotationPoint(5.0F, 18.0F + f1, 0.0F);
-        this.legRight.addBox(-3.5F, -3.0F, -3.0F, 6, 16, 5, f);
-    }
-
+    /// 1.12.2 setLivingAnimations: arm pose from hit / animation timers, else the walk swing.
     @Override
-    public void render(Entity entityIn, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch, float scale) {
-        EntityUtilityGolem golem = (EntityUtilityGolem)entityIn;
-        if (golem.isSitting()) {
-            limbSwingAmount = 0.0F;
-        }
-        this.head.rotateAngleY = netHeadYaw / (180.0F / (float)Math.PI);
-        this.head.rotateAngleX = headPitch / (180.0F / (float)Math.PI);
-        this.legLeft.rotateAngleX = -1.5F * this.adjust(limbSwing, 13.0F) * limbSwingAmount;
-        this.legRight.rotateAngleX = 1.5F * this.adjust(limbSwing, 13.0F) * limbSwingAmount;
-        GlStateManager.pushMatrix();
-        GlStateManager.translate(0.0F, golem.isSitting() ? 0.25F : 0.0F, 0.0F);
-        this.head.render(scale);
-        this.body.render(scale);
-        this.armRight.render(scale);
-        this.armLeft.render(scale);
-        GlStateManager.popMatrix();
-        this.legLeft.render(scale);
-        this.legRight.render(scale);
-    }
-
-    @Override
-    public void setLivingAnimations(EntityLivingBase entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTickTime) {
-        EntityLargeGolem e1 = (EntityLargeGolem)entitylivingbaseIn;
-        int i = e1.getHitTime();
-        if (i > 0) {
-            this.armRight.rotateAngleX = -2.0F + 1.5F * this.adjust(i - partialTickTime, 10.0F);
-            this.armLeft.rotateAngleX = -2.0F + 1.5F * this.adjust(i - partialTickTime, 10.0F);
+    public void prepareMobModel(EntityLargeGolem golem, float limbSwing, float limbSwingAmount, float partialTick) {
+        int hit = golem.getHitTime();
+        if (hit > 0) {
+            this.armRight.xRot = -2.0F + 1.5F * this.adjust(hit - partialTick, 10.0F);
+            this.armLeft.xRot = -2.0F + 1.5F * this.adjust(hit - partialTick, 10.0F);
         }
         else {
-            int j = e1.getAnimationTime();
-            if (j > 0) {
-                this.armRight.rotateAngleX = -0.8F + 0.025F * this.adjust(j, 70.0F);
-                this.armLeft.rotateAngleX = 0.0F;
+            int anim = golem.getAnimationTime();
+            if (anim > 0) {
+                this.armRight.xRot = -0.8F + 0.025F * this.adjust(anim, 70.0F);
+                this.armLeft.xRot = 0.0F;
             }
             else {
-                this.armRight.rotateAngleX = (-0.2F + 1.5F * this.adjust(limbSwing, 13.0F)) * limbSwingAmount;
-                this.armLeft.rotateAngleX = (-0.2F - 1.5F * this.adjust(limbSwing, 13.0F)) * limbSwingAmount;
+                this.armRight.xRot = (-0.2F + 1.5F * this.adjust(limbSwing, 13.0F)) * limbSwingAmount;
+                this.armLeft.xRot = (-0.2F - 1.5F * this.adjust(limbSwing, 13.0F)) * limbSwingAmount;
             }
         }
+    }
+
+    @Override
+    public void setupAnim(EntityLargeGolem golem, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+        this.sitting = golem.isSitting();
+        if (this.sitting) {
+            limbSwingAmount = 0.0F;
+        }
+        this.head.yRot = netHeadYaw / (180.0F / (float)Math.PI);
+        this.head.xRot = headPitch / (180.0F / (float)Math.PI);
+        this.legLeft.xRot = -1.5F * this.adjust(limbSwing, 13.0F) * limbSwingAmount;
+        this.legRight.xRot = 1.5F * this.adjust(limbSwing, 13.0F) * limbSwingAmount;
+    }
+
+    @Override
+    public void renderToBuffer(PoseStack poseStack, VertexConsumer buffer, int packedLight, int packedOverlay, float r, float g, float b, float a) {
+        poseStack.pushPose();
+        // Sitting drops the upper body onto the legs. Model space is Y-down, sign as in 1.12.2.
+        poseStack.translate(0.0F, this.sitting ? 0.25F : 0.0F, 0.0F);
+        this.head.render(poseStack, buffer, packedLight, packedOverlay, r, g, b, a);
+        this.body.render(poseStack, buffer, packedLight, packedOverlay, r, g, b, a);
+        this.armRight.render(poseStack, buffer, packedLight, packedOverlay, r, g, b, a);
+        this.armLeft.render(poseStack, buffer, packedLight, packedOverlay, r, g, b, a);
+        poseStack.popPose();
+        this.legLeft.render(poseStack, buffer, packedLight, packedOverlay, r, g, b, a);
+        this.legRight.render(poseStack, buffer, packedLight, packedOverlay, r, g, b, a);
     }
 
     private float adjust(float f, float f1) {

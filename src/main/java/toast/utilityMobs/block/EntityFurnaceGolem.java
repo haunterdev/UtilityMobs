@@ -1,30 +1,49 @@
 package toast.utilityMobs.block;
 
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Blocks;
-import net.minecraft.init.Items;
-import net.minecraft.inventory.ISidedInventory;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.crafting.FurnaceRecipes;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.network.datasync.DataParameter;
-import net.minecraft.network.datasync.DataSerializers;
-import net.minecraft.network.datasync.EntityDataManager;
-import net.minecraft.tileentity.TileEntityFurnace;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
+import javax.annotation.Nullable;
+
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.WorldlyContainer;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ContainerData;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.crafting.SmeltingRecipe;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+import net.minecraftforge.common.ForgeHooks;
 import toast.utilityMobs.TargetHelper;
 import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.network.GuiHelper;
 
-public class EntityFurnaceGolem extends EntityContainerGolem implements ISidedInventory
+public class EntityFurnaceGolem extends EntityContainerGolem implements WorldlyContainer
 {
+    /// Differs from 1.12.2, which left every golem outside the six that already override this
+    /// on the default iron-golem hurt/death sounds. Flavoured by build material: furnace.
+    @Override
+    protected net.minecraft.world.level.block.SoundType getGolemSoundType() {
+        return net.minecraft.world.level.block.SoundType.STONE;
+    }
+
     /// The textures for this class.
-    public static final ResourceLocation[] TEXTURES = { new ResourceLocation(_UtilityMobs.TEXTURE + "block/furnacegolem.png"), new ResourceLocation(_UtilityMobs.TEXTURE + "block/furnacegolem_fire.png") };
+    public static final ResourceLocation[] TEXTURES = {
+        new ResourceLocation(_UtilityMobs.TEXTURE + "block/furnacegolem.png"),
+        new ResourceLocation(_UtilityMobs.TEXTURE + "block/furnacegolem_fire.png")
+    };
+
+    /// How long one smelt takes. Vanilla's cooking total time, which 1.12.2 hardcoded as 200.
+    private static final int COOK_TIME_TOTAL = 200;
 
     /// burningState; While this is 1, the furnace will be in its "on" state.
-    private static final DataParameter<Byte> BURNING = EntityDataManager.createKey(EntityFurnaceGolem.class, DataSerializers.BYTE);
+    private static final EntityDataAccessor<Byte> BURNING = SynchedEntityData.defineId(EntityFurnaceGolem.class, EntityDataSerializers.BYTE);
 
     /// The number of ticks that the furnace will keep burning.
     public int burnTime = 0;
@@ -33,83 +52,117 @@ public class EntityFurnaceGolem extends EntityContainerGolem implements ISidedIn
     /// The number of ticks that the current item has been cooking for.
     public int cookTime = 0;
 
-    public EntityFurnaceGolem(World world) {
-        super(world);
+    /// The four values vanilla's FurnaceMenu syncs to the screen: lit time, lit duration, cooking
+    /// progress, cooking total. 1.12.2 sent the same numbers through Container.detectAndSendChanges.
+    private final ContainerData furnaceData = new ContainerData() {
+        @Override
+        public int get(int index) {
+            switch (index) {
+                case 0: return EntityFurnaceGolem.this.burnTime;
+                case 1: return EntityFurnaceGolem.this.itemBurnTime;
+                case 2: return EntityFurnaceGolem.this.cookTime;
+                case 3: return EntityFurnaceGolem.COOK_TIME_TOTAL;
+                default: return 0;
+            }
+        }
+
+        @Override
+        public void set(int index, int value) {
+            switch (index) {
+                case 0: EntityFurnaceGolem.this.burnTime = value; break;
+                case 1: EntityFurnaceGolem.this.itemBurnTime = value; break;
+                case 2: EntityFurnaceGolem.this.cookTime = value; break;
+                default: break;
+            }
+        }
+
+        @Override
+        public int getCount() {
+            return 4;
+        }
+    };
+
+    // Registered entity size: 0.9375 x 0.9375 (set via EntityType.Builder.sized at registration).
+    public EntityFurnaceGolem(EntityType<? extends EntityFurnaceGolem> type, Level level) {
+        super(type, level);
         this.texture = EntityFurnaceGolem.TEXTURES[0];
-        this.isImmuneToFire = true;
+    }
+
+    /// 1.12.2 set isImmuneToFire in the constructor.
+    @Override
+    public boolean fireImmune() {
+        return true;
+    }
+
+    public ContainerData getFurnaceData() {
+        return this.furnaceData;
     }
 
     @Override
-    public int getTotalArmorValue() {
-        return Math.min(20, super.getTotalArmorValue() + 2);
+    public int getArmorValue() {
+        return Math.min(20, super.getArmorValue() + 2);
     }
 
-    /// Used to initialize dataWatcher variables.
+    // Used to initialize data manager variables.
     @Override
-    protected void entityInit() {
-        super.entityInit();
-        this.dataManager.register(BURNING, Byte.valueOf((byte)0));
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(BURNING, Byte.valueOf((byte)0));
     }
 
-    /// Returns true if this mob is on fire. Used for rendering.
-    @Override
-    public boolean isBurning() {
-        return this.getBurningState();
-    }
+    // Not ported: 1.12.2's `isBurning() { return getBurningState(); }`. In 1.12.2 that drove the texture
+    // swap, but it also fed the renderer's fire overlay, so a smelting furnace golem was wrapped in
+    // flames as though it were burning to death. The texture swap is done directly in tick(), and
+    // spawnFurnaceFX below emits the lit-furnace particles the steam golem already uses, which is what
+    // the effect was meant to convey. Differs from 1.12.2, deliberate.
 
-    /// Gets/sets this lava monster's burningState variable. Used for rendering.
+    /// Gets/sets this furnace golem's burningState variable. Used for rendering.
     public boolean getBurningState() {
-        return this.dataManager.get(BURNING).byteValue() == 1;
+        return this.entityData.get(BURNING).byteValue() == 1;
     }
     public void setBurningState(boolean state) {
-        this.dataManager.set(BURNING, Byte.valueOf(state ? (byte)1 : (byte)0));
+        this.entityData.set(BURNING, Byte.valueOf(state ? (byte)1 : (byte)0));
     }
 
     /// Returns true if automation is allowed to insert the given stack (ignoring stack size) into the given slot.
     @Override
-    public boolean isItemValidForSlot(int slot, ItemStack itemStack) {
-        return slot == 2 ? false : slot == 1 ? TileEntityFurnace.isItemFuel(itemStack) : true;
+    public boolean canPlaceItem(int slot, ItemStack itemStack) {
+        return slot == 2 ? false : slot == 1 ? AbstractFurnaceBlockEntity.isFuel(itemStack) : true;
     }
 
     /// Returns an array containing the indices of the slots that can be accessed by automation on the given side of this block.
-    @Override /// ISidedInventory
-    public int[] getSlotsForFace(net.minecraft.util.EnumFacing side) {
-        return side == net.minecraft.util.EnumFacing.DOWN ? new int[] { 2, 1 } : side == net.minecraft.util.EnumFacing.UP ? new int[] { 0 } : new int[] { 1 };
+    @Override /// WorldlyContainer
+    public int[] getSlotsForFace(Direction side) {
+        return side == Direction.DOWN ? new int[] { 2, 1 } : side == Direction.UP ? new int[] { 0 } : new int[] { 1 };
     }
 
     /// Returns true if automation can insert the given item in the given slot from the given side.
-    @Override /// ISidedInventory
-    public boolean canInsertItem(int slot, ItemStack itemStack, net.minecraft.util.EnumFacing side) {
-        return this.isItemValidForSlot(slot, itemStack);
+    @Override /// WorldlyContainer
+    public boolean canPlaceItemThroughFace(int slot, ItemStack itemStack, @Nullable Direction side) {
+        return this.canPlaceItem(slot, itemStack);
     }
 
     /// Returns true if automation can extract the given item in the given slot from the given side.
-    @Override /// ISidedInventory
-    public boolean canExtractItem(int slot, ItemStack itemStack, net.minecraft.util.EnumFacing side) {
-        return side != net.minecraft.util.EnumFacing.DOWN || slot != 1 || itemStack.getItem() == Items.BUCKET;
+    @Override /// WorldlyContainer
+    public boolean canTakeItemThroughFace(int slot, ItemStack itemStack, Direction side) {
+        return side != Direction.DOWN || slot != 1 || itemStack.getItem() == Items.BUCKET;
     }
 
     /// Returns the number of slots in the inventory.
     @Override
-    public int getSizeInventory() {
+    public int getContainerSize() {
         return 3;
-    }
-
-    /// Returns the name of the inventory.
-    @Override
-    public String getName() {
-        return this.hasCustomName() ? this.getCustomNameTag() : "Furnace Golem";
     }
 
     @Override
     protected Item getDropItem() {
-        return Item.getItemFromBlock(Blocks.FURNACE);
+        return Items.FURNACE;
     }
 
     /// Opens this block golem's GUI.
     @Override
-    public boolean openGUI(EntityPlayer player) {
-        if (!this.world.isRemote) {
+    public boolean openGUI(Player player) {
+        if (!this.level().isClientSide) {
             GuiHelper.displayGUIFurnace(player, this);
         }
         return true;
@@ -122,34 +175,62 @@ public class EntityFurnaceGolem extends EntityContainerGolem implements ISidedIn
 
     /// Called each tick this entity exists.
     @Override
-    public void onUpdate() {
-        super.onUpdate();
-        if (this.world.isRemote) {
+    public void tick() {
+        super.tick();
+        if (this.level().isClientSide) {
             this.texture = this.getBurningState() ? EntityFurnaceGolem.TEXTURES[1] : EntityFurnaceGolem.TEXTURES[0];
+            if (this.getBurningState()) {
+                this.spawnFurnaceFX();
+            }
         }
+    }
+
+    /// Emits the lit-furnace crackle plus flame/smoke from the golem's furnace face while smelting.
+    /// Same rates as vanilla FurnaceBlock.animateTick and as EntitySteamGolem.spawnFurnaceFX: one flame
+    /// and one smoke per tick, 10% chance of the crackle. Client-only, called from tick's client branch.
+    private void spawnFurnaceFX() {
+        float yaw = this.yBodyRot * ((float)Math.PI / 180.0F);
+        double forwardX = -net.minecraft.util.Mth.sin(yaw);
+        double forwardZ = net.minecraft.util.Mth.cos(yaw);
+        double faceX = this.getX() + forwardX * 0.55;
+        double faceY = this.getY() + this.getBbHeight() * 0.5;
+        double faceZ = this.getZ() + forwardZ * 0.55;
+        double side = (this.random.nextDouble() - 0.5) * 0.6;
+        double px = faceX + forwardZ * side;
+        double pz = faceZ - forwardX * side;
+        double py = faceY + (this.random.nextDouble() - 0.3) * 0.4;
+        if (this.random.nextDouble() < 0.1) {
+            this.level().playLocalSound(this.getX(), this.getY(), this.getZ(),
+                net.minecraft.sounds.SoundEvents.FURNACE_FIRE_CRACKLE,
+                net.minecraft.sounds.SoundSource.BLOCKS, 1.0F, 1.0F, false);
+        }
+        this.level().addParticle(net.minecraft.core.particles.ParticleTypes.SMOKE, px, py, pz, 0.0, 0.0, 0.0);
+        this.level().addParticle(net.minecraft.core.particles.ParticleTypes.FLAME, px, py, pz, 0.0, 0.0, 0.0);
     }
 
     /// Called each tick this entity is alive.
     @Override
-    public void onLivingUpdate() {
+    public void aiStep() {
         if (this.burnTime > 0) {
             this.burnTime--;
         }
-        if (!this.world.isRemote) {
+        if (!this.level().isClientSide) {
             if (this.burnTime == 0 && this.canSmelt()) {
-                ItemStack fuelStack = this.getStackInSlot(1);
-                this.itemBurnTime = this.burnTime = TileEntityFurnace.getItemBurnTime(fuelStack);
+                ItemStack fuelStack = this.getItem(1);
+                this.itemBurnTime = this.burnTime = EntityFurnaceGolem.burnDuration(fuelStack);
                 if (this.burnTime > 0 && !fuelStack.isEmpty()) {
                     Item fuelItem = fuelStack.getItem();
                     fuelStack.shrink(1);
                     if (fuelStack.isEmpty()) {
-                        this.setInventorySlotContents(1, fuelItem.getContainerItem(fuelStack));
+                        this.setItem(1, fuelItem.getCraftingRemainingItem() == null
+                            ? ItemStack.EMPTY
+                            : new ItemStack(fuelItem.getCraftingRemainingItem()));
                     }
                 }
             }
             if (this.getBurningState() && this.canSmelt()) {
                 this.cookTime++;
-                if (this.cookTime == 200) {
+                if (this.cookTime == EntityFurnaceGolem.COOK_TIME_TOTAL) {
                     this.cookTime = 0;
                     this.smeltItem();
                 }
@@ -162,66 +243,79 @@ public class EntityFurnaceGolem extends EntityContainerGolem implements ISidedIn
                 this.setBurningState(burnState);
             }
         }
-        super.onLivingUpdate();
+        super.aiStep();
+    }
+
+    /// How long the given stack burns for. 1.12.2 asked TileEntityFurnace directly; the Forge hook is
+    /// the 1.20.1 equivalent and is what honours other mods' fuels.
+    private static int burnDuration(ItemStack fuelStack) {
+        return ForgeHooks.getBurnTime(fuelStack, RecipeType.SMELTING);
+    }
+
+    /// The smelting result of whatever is in the input slot, or an empty stack.
+    private ItemStack smeltingResult() {
+        if (this.level() == null)
+            return ItemStack.EMPTY;
+        return this.level().getRecipeManager()
+            .getRecipeFor(RecipeType.SMELTING, this, this.level())
+            .map((SmeltingRecipe recipe) -> recipe.getResultItem(this.level().registryAccess()))
+            .orElse(ItemStack.EMPTY);
     }
 
     /// Returns true if the furnace can smelt an item, i.e. has a source item, destination stack isn't full, etc.
     public boolean canSmelt() {
-        if (this.getStackInSlot(0).isEmpty())
+        if (this.getItem(0).isEmpty())
             return false;
-        ItemStack itemStack = FurnaceRecipes.instance().getSmeltingResult(this.getStackInSlot(0));
+        ItemStack itemStack = this.smeltingResult();
         if (itemStack.isEmpty())
             return false;
-        if (this.getStackInSlot(2).isEmpty())
+        if (this.getItem(2).isEmpty())
             return true;
-        if (!this.getStackInSlot(2).isItemEqual(itemStack))
+        if (!ItemStack.isSameItem(this.getItem(2), itemStack))
             return false;
-        int result = this.getStackInSlot(2).getCount() + itemStack.getCount();
-        return result <= this.getInventoryStackLimit() && result <= itemStack.getMaxStackSize();
+        int result = this.getItem(2).getCount() + itemStack.getCount();
+        return result <= this.getMaxStackSize() && result <= itemStack.getMaxStackSize();
     }
 
     /// Turn one item from the furnace source stack into the appropriate smelted item in the furnace result stack.
     public void smeltItem() {
         if (this.canSmelt()) {
-            ItemStack itemStack = FurnaceRecipes.instance().getSmeltingResult(this.getStackInSlot(0));
-            if (this.getStackInSlot(2).isEmpty()) {
-                this.setInventorySlotContents(2, itemStack.copy());
+            ItemStack itemStack = this.smeltingResult();
+            if (this.getItem(2).isEmpty()) {
+                this.setItem(2, itemStack.copy());
             }
-            else if (this.getStackInSlot(2).isItemEqual(itemStack)) {
-                this.getStackInSlot(2).grow(itemStack.getCount());
+            else if (ItemStack.isSameItem(this.getItem(2), itemStack)) {
+                this.getItem(2).grow(itemStack.getCount());
             }
-            this.getStackInSlot(0).shrink(1);
-            if (this.getStackInSlot(0).isEmpty()) {
-                this.setInventorySlotContents(0, ItemStack.EMPTY);
+            this.getItem(0).shrink(1);
+            if (this.getItem(0).isEmpty()) {
+                this.setItem(0, ItemStack.EMPTY);
             }
         }
     }
 
-    /// Saves this entity to NBT.
     @Override
-    public void writeEntityToNBT(NBTTagCompound tag) {
-        super.writeEntityToNBT(tag);
-        tag.setShort("BurnTime", (short)this.burnTime);
-        tag.setShort("CookTime", (short)this.cookTime);
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        tag.putShort("BurnTime", (short)this.burnTime);
+        tag.putShort("CookTime", (short)this.cookTime);
     }
 
-    /// Loads this entity from NBT.
     @Override
-    public void readEntityFromNBT(NBTTagCompound tag) {
-        super.readEntityFromNBT(tag);
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
         this.burnTime = tag.getShort("BurnTime");
         this.cookTime = tag.getShort("CookTime");
-        this.itemBurnTime = TileEntityFurnace.getItemBurnTime(this.getStackInSlot(1));
+        this.itemBurnTime = EntityFurnaceGolem.burnDuration(this.getItem(1));
     }
 
-    /// Loads this entity from NBT.
     @Override
-    public void takeContentsFromNBT(NBTTagCompound tag) {
+    public void takeContentsFromNBT(CompoundTag tag) {
         super.takeContentsFromNBT(tag);
         this.burnTime = tag.getShort("BurnTime");
         this.cookTime = tag.getShort("CookTime");
-        this.itemBurnTime = TileEntityFurnace.getItemBurnTime(this.getStackInSlot(1));
-        tag.setShort("BurnTime", (short)0);
-        tag.setShort("CookTime", (short)0);
+        this.itemBurnTime = EntityFurnaceGolem.burnDuration(this.getItem(1));
+        tag.putShort("BurnTime", (short)0);
+        tag.putShort("CookTime", (short)0);
     }
 }

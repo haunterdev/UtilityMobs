@@ -2,17 +2,17 @@ package toast.utilityMobs;
 
 import java.util.ArrayDeque;
 
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Items;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.LogicalSide;
 import toast.utilityMobs.event.UtilityMobsEvent;
-import net.minecraftforge.fml.common.eventhandler.EventPriority;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.PlayerEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
-import net.minecraftforge.fml.relauncher.Side;
 
 public class TickHandler
 {
@@ -34,7 +34,7 @@ public class TickHandler
      */
     @SubscribeEvent(priority = EventPriority.LOW)
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
-        TargetHelper.fetchTargetHelpers(event.player);
+        TargetHelper.fetchTargetHelpers(event.getEntity());
     }
 
     /**
@@ -42,11 +42,13 @@ public class TickHandler
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onItemCrafted(PlayerEvent.ItemCraftedEvent event) {
-        if (event.crafting.isEmpty() || event.crafting.getItem() != Items.WRITABLE_BOOK && event.crafting.getItem() != Items.WRITTEN_BOOK || event.crafting.getTagCompound() == null || !event.crafting.getTagCompound().hasKey("umu"))
+        ItemStack crafted = event.getCrafting();
+        if (crafted.isEmpty() || !crafted.is(Items.WRITABLE_BOOK) && !crafted.is(Items.WRITTEN_BOOK)
+                || crafted.getTag() == null || !crafted.getTag().contains("umu"))
             return;
-        event.crafting.getTagCompound().removeTag("umu");
-        TargetHelper.read(event.player.getName(), event.crafting);
-        TargetHelper.stampSignature(event.crafting);
+        crafted.getTag().remove("umu");
+        TargetHelper.read(event.getEntity().getGameProfile().getName(), crafted);
+        TargetHelper.stampSignature(crafted);
     }
 
     /**
@@ -62,35 +64,25 @@ public class TickHandler
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.side != Side.SERVER || event.phase != TickEvent.Phase.END)
+        if (event.side != LogicalSide.SERVER || event.phase != TickEvent.Phase.END)
             return;
-        EntityPlayer player = event.player;
-        ItemStack held = player.getHeldItemMainhand();
-        if (held.isEmpty() || held.getTagCompound() == null
-                || held.getItem() != Items.WRITABLE_BOOK && held.getItem() != Items.WRITTEN_BOOK
-                || !held.getTagCompound().hasKey("umt"))
+        Player player = event.player;
+        ItemStack held = player.getMainHandItem();
+        if (held.isEmpty() || held.getTag() == null
+                || !held.is(Items.WRITABLE_BOOK) && !held.is(Items.WRITTEN_BOOK)
+                || !held.getTag().contains("umt"))
             return;
-        NBTTagCompound tag = held.getTagCompound();
+        CompoundTag tag = held.getTag();
         byte id = tag.getByte("umt");
-        if (!tag.hasKey("umh")) {
+        if (!tag.contains("umh")) {
             // Never seen this book (fresh from creative / pre-update): populate, don't parse.
-            TargetHelper.write(player.getName(), held, id);
+            TargetHelper.write(player.getGameProfile().getName(), held, id);
             TargetHelper.stampSignature(held);
         }
-        else if (tag.getInteger("umh") != TargetHelper.signatureOf(held)) {
+        else if (tag.getInt("umh") != TargetHelper.signatureOf(held)) {
             // Pages changed since we last wrote them -> the player edited and closed the book.
-            TargetHelper.read(player.getName(), held);
+            TargetHelper.read(player.getGameProfile().getName(), held);
             TargetHelper.stampSignature(held);
-        }
-    }
-
-    /**
-     * Called each client tick.
-     */
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) {
-            _UtilityMobs.proxy.handleClientTick();
         }
     }
 

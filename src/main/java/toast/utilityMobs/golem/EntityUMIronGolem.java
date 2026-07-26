@@ -1,44 +1,56 @@
 package toast.utilityMobs.golem;
 
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.EntityAILookIdle;
-import net.minecraft.entity.ai.EntityAIMoveTowardsRestriction;
-import net.minecraft.entity.ai.EntityAIMoveTowardsTarget;
-import net.minecraft.entity.ai.EntityAIWander;
-import net.minecraft.entity.ai.EntityAIWatchClosest;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Blocks;
-import net.minecraft.init.Items;
-import net.minecraft.item.Item;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.MoveTowardsRestrictionGoal;
+import net.minecraft.world.entity.ai.goal.MoveTowardsTargetGoal;
+import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import toast.utilityMobs.ai.EntityAIGolemTarget;
+import toast.utilityMobs.ai.EntityAIGolemWander;
 import toast.utilityMobs.ai.EntityAIWeaponAttack;
 
 public class EntityUMIronGolem extends EntityLargeGolem
 {
-    // The texture for this class.
-    public static final ResourceLocation TEXTURE = new ResourceLocation("textures/entity/iron_golem.png");
+    /// Differs from 1.12.2, which left every golem outside the six that already override this
+    /// on the default iron-golem hurt/death sounds. Flavoured by build material: iron blocks.
+    @Override
+    protected net.minecraft.world.level.block.SoundType getGolemSoundType() {
+        return net.minecraft.world.level.block.SoundType.METAL;
+    }
 
-    public EntityUMIronGolem(World world) {
-        super(world);
+    // The texture for this class. Reuses the vanilla iron golem skin.
+    public static final ResourceLocation TEXTURE = new ResourceLocation("textures/entity/iron_golem/iron_golem.png");
+
+    public EntityUMIronGolem(EntityType<? extends EntityUMIronGolem> type, Level level) {
+        super(type, level);
         this.texture = EntityUMIronGolem.TEXTURE;
-        this.tasks.addTask(1, new EntityAIWeaponAttack(this, 1.0));
-        this.tasks.addTask(2, new EntityAIMoveTowardsTarget(this, 0.9, 32.0F));
-        this.tasks.addTask(4, new EntityAIMoveTowardsRestriction(this, 1.0));
-        this.tasks.addTask(6, new toast.utilityMobs.ai.EntityAIGolemWander(this, 0.6));
-        this.tasks.addTask(7, new EntityAIWatchClosest(this, EntityPlayer.class, 6.0F));
-        this.tasks.addTask(8, new EntityAILookIdle(this));
-        this.targetTasks.addTask(1, new EntityAIGolemTarget(this));
+    }
+
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+        this.goalSelector.addGoal(1, new EntityAIWeaponAttack(this, 1.0));
+        this.goalSelector.addGoal(2, new MoveTowardsTargetGoal(this, 0.9, 32.0F));
+        this.goalSelector.addGoal(4, new MoveTowardsRestrictionGoal(this, 1.0));
+        this.goalSelector.addGoal(6, new EntityAIGolemWander(this, 0.6));
+        this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 6.0F));
+        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
+        this.targetSelector.addGoal(1, new EntityAIGolemTarget(this));
     }
 
     // Initializes this entity's attributes.
-    @Override
-    protected void applyEntityAttributes() {
-        super.applyEntityAttributes();
-        this.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).setBaseValue(100.0);
-        this.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE).setBaseValue(17.0);
-        this.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).setBaseValue(0.25);
+    public static AttributeSupplier.Builder createAttributes() {
+        return EntityLargeGolem.createAttributes()
+            .add(Attributes.MAX_HEALTH, 100.0)
+            .add(Attributes.ATTACK_DAMAGE, 17.0)
+            .add(Attributes.MOVEMENT_SPEED, 0.25);
     }
 
     @Override
@@ -48,11 +60,11 @@ public class EntityUMIronGolem extends EntityLargeGolem
 
     @Override
     protected void dropFewItems(boolean recentlyHit, int looting, float dropChance) {
-        for (int i = this.rand.nextInt(3); i-- > 0;) {
-            this.dropItem(Item.getItemFromBlock(Blocks.RED_FLOWER), 1);
+        for (int i = this.random.nextInt(3); i-- > 0;) {
+            this.spawnAtLocation(Items.POPPY);
         }
-        for (int i = this.rand.nextInt(3) + 3; i-- > 0;) {
-            this.dropItem(this.getDropItem(), 1);
+        for (int i = this.random.nextInt(3) + 3; i-- > 0;) {
+            this.spawnAtLocation(this.getDropItem());
         }
     }
 }

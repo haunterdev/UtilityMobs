@@ -28,7 +28,7 @@
         ],
         "mapping": {
           "B": "minecraft:obsidian",
-          "0": "minecraft:skull"
+          "0": "minecraft:skeleton_skull"
         },
         "offset": [
           0,

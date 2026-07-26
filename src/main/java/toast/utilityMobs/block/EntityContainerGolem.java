@@ -1,56 +1,61 @@
 package toast.utilityMobs.block;
 
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.IInventory;
-import net.minecraft.inventory.ItemStackHelper;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.network.datasync.DataParameter;
-import net.minecraft.network.datasync.DataSerializers;
-import net.minecraft.network.datasync.EntityDataManager;
-import net.minecraft.util.NonNullList;
-import net.minecraft.world.World;
+import net.minecraft.core.NonNullList;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.world.Container;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
-public abstract class EntityContainerGolem extends EntityBlockGolem implements IInventory
+public abstract class EntityContainerGolem extends EntityBlockGolem implements Container
 {
     // numUsingPlayers; The number of players using this chest golem.
-    private static final DataParameter<Byte> USING = EntityDataManager.createKey(EntityContainerGolem.class, DataSerializers.BYTE);
+    private static final EntityDataAccessor<Byte> USING = SynchedEntityData.defineId(EntityContainerGolem.class, EntityDataSerializers.BYTE);
 
     // The contents of this chest.
     private NonNullList<ItemStack> contents;
 
-    public EntityContainerGolem(World world) {
-        super(world);
-        this.contents = NonNullList.withSize(this.getSizeInventory(), ItemStack.EMPTY);
+    public EntityContainerGolem(EntityType<? extends EntityContainerGolem> type, Level level) {
+        super(type, level);
+        this.contents = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
     }
 
     // Used to initialize data manager variables.
     @Override
-    protected void entityInit() {
-        super.entityInit();
-        this.dataManager.register(USING, Byte.valueOf((byte)0));
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(USING, Byte.valueOf((byte)0));
     }
 
     // Functions for numUsingPlayers.
     public void incNumUsingPlayers() {
-        this.dataManager.set(USING, Byte.valueOf((byte)(this.dataManager.get(USING).byteValue() + 1)));
+        this.entityData.set(USING, Byte.valueOf((byte)(this.entityData.get(USING).byteValue() + 1)));
     }
     public void decNumUsingPlayers() {
-        this.dataManager.set(USING, Byte.valueOf((byte)(this.dataManager.get(USING).byteValue() - 1)));
+        this.entityData.set(USING, Byte.valueOf((byte)(this.entityData.get(USING).byteValue() - 1)));
     }
     public boolean isOpen() {
-        return this.dataManager.get(USING).byteValue() > 0;
+        return this.entityData.get(USING).byteValue() > 0;
     }
 
     // Called when this block golem is told to get up.
     @Override
     public void setClosed() {
-        this.dataManager.set(USING, Byte.valueOf((byte)0));
+        this.entityData.set(USING, Byte.valueOf((byte)0));
     }
 
     @Override
-    public int getSizeInventory() {
+    public int getContainerSize() {
         return 27;
     }
 
@@ -64,101 +69,80 @@ public abstract class EntityContainerGolem extends EntityBlockGolem implements I
     }
 
     @Override
-    public ItemStack getStackInSlot(int slot) {
+    public ItemStack getItem(int slot) {
         return this.contents.get(slot);
     }
 
     @Override
-    public ItemStack decrStackSize(int slot, int amount) {
-        return ItemStackHelper.getAndSplit(this.contents, slot, amount);
+    public ItemStack removeItem(int slot, int amount) {
+        return ContainerHelper.removeItem(this.contents, slot, amount);
     }
 
     @Override
-    public ItemStack removeStackFromSlot(int slot) {
-        return ItemStackHelper.getAndRemove(this.contents, slot);
+    public ItemStack removeItemNoUpdate(int slot) {
+        return ContainerHelper.takeItem(this.contents, slot);
     }
 
     @Override
-    public void setInventorySlotContents(int slot, ItemStack itemStack) {
+    public void setItem(int slot, ItemStack itemStack) {
         this.contents.set(slot, itemStack);
-        if (!itemStack.isEmpty() && itemStack.getCount() > this.getInventoryStackLimit()) {
-            itemStack.setCount(this.getInventoryStackLimit());
+        if (!itemStack.isEmpty() && itemStack.getCount() > this.getMaxStackSize()) {
+            itemStack.setCount(this.getMaxStackSize());
         }
     }
 
-    // Returns the name of the inventory (also the entity's name).
     @Override
-    public String getName() {
-        return this.hasCustomName() ? this.getCustomNameTag() : "Chest Golem";
-    }
-
-    @Override
-    public int getInventoryStackLimit() {
+    public int getMaxStackSize() {
         return 64;
     }
 
     @Override
-    public boolean isUsableByPlayer(EntityPlayer player) {
+    public boolean stillValid(Player player) {
         return this.canInteract(player);
     }
 
     @Override
-    public void openInventory(EntityPlayer player) {
+    public void startOpen(Player player) {
         this.incNumUsingPlayers();
     }
 
     @Override
-    public void closeInventory(EntityPlayer player) {
+    public void stopOpen(Player player) {
         this.decNumUsingPlayers();
     }
 
     @Override
-    public boolean isItemValidForSlot(int slot, ItemStack itemStack) {
+    public boolean canPlaceItem(int slot, ItemStack itemStack) {
         return true;
     }
 
     @Override
-    public int getField(int id) {
-        return 0;
-    }
-
-    @Override
-    public void setField(int id, int value) {
-        // No fields
-    }
-
-    @Override
-    public int getFieldCount() {
-        return 0;
-    }
-
-    @Override
-    public void clear() {
+    public void clearContent() {
         for (int i = 0; i < this.contents.size(); i++) {
             this.contents.set(i, ItemStack.EMPTY);
         }
     }
 
     @Override
-    public void markDirty() {
+    public void setChanged() {
         // Do nothing
     }
 
     @Override
     protected void dropFewItems(boolean recentlyHit, int looting, float dropChance) {
         super.dropFewItems(recentlyHit, looting, dropChance);
-        for (int i = 0; i < this.getSizeInventory(); i++) {
+        for (int i = 0; i < this.getContainerSize(); i++) {
             ItemStack stack = this.contents.get(i);
             if (!stack.isEmpty()) {
                 ItemStack split = stack.copy();
                 while (stack.getCount() > 0) {
-                    int splitSize = this.rand.nextInt(21) + 10;
+                    int splitSize = this.random.nextInt(21) + 10;
                     if (splitSize > stack.getCount()) {
                         splitSize = stack.getCount();
                     }
                     stack.shrink(splitSize);
                     split.setCount(splitSize);
-                    this.entityDropItem(split.copy(), 0.0F);
+                    this.spawnAtLocation(split.copy(), 0.0F);
                 }
                 this.contents.set(i, ItemStack.EMPTY);
             }
@@ -167,57 +151,60 @@ public abstract class EntityContainerGolem extends EntityBlockGolem implements I
 
     // Opens this block golem's GUI.
     @Override
-    public boolean openGUI(EntityPlayer player) {
-        if (!this.world.isRemote) {
-            player.displayGUIChest(this);
+    public boolean openGUI(Player player) {
+        if (!this.level().isClientSide) {
+            // ChestMenu drives startOpen/stopOpen (the sit-while-open behavior) automatically.
+            player.openMenu(new SimpleMenuProvider(
+                (id, inventory, p) -> ChestMenu.threeRows(id, inventory, this),
+                this.getDisplayName()));
         }
         return true;
     }
 
     @Override
-    public void writeEntityToNBT(NBTTagCompound tag) {
-        super.writeEntityToNBT(tag);
-        NBTTagList tagList = new NBTTagList();
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        ListTag tagList = new ListTag();
         for (int slot = 0; slot < this.contents.size(); slot++) {
             if (!this.contents.get(slot).isEmpty()) {
-                NBTTagCompound slotTag = new NBTTagCompound();
-                slotTag.setByte("Slot", (byte)slot);
-                this.contents.get(slot).writeToNBT(slotTag);
-                tagList.appendTag(slotTag);
+                CompoundTag slotTag = new CompoundTag();
+                slotTag.putByte("Slot", (byte)slot);
+                this.contents.get(slot).save(slotTag);
+                tagList.add(slotTag);
             }
         }
-        tag.setTag("Items", tagList);
+        tag.put("Items", tagList);
     }
 
     @Override
-    public void readEntityFromNBT(NBTTagCompound tag) {
-        super.readEntityFromNBT(tag);
-        NBTTagList tagList = tag.getTagList("Items", new NBTTagCompound().getId());
-        this.contents = NonNullList.withSize(this.getSizeInventory(), ItemStack.EMPTY);
-        for (int i = 0; i < tagList.tagCount(); i++) {
-            NBTTagCompound slotTag = tagList.getCompoundTagAt(i);
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        ListTag tagList = tag.getList("Items", Tag.TAG_COMPOUND);
+        this.contents = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < tagList.size(); i++) {
+            CompoundTag slotTag = tagList.getCompound(i);
             int slot = slotTag.getByte("Slot") & 255;
             if (slot >= 0 && slot < this.contents.size()) {
-                this.contents.set(slot, new ItemStack(slotTag));
+                this.contents.set(slot, ItemStack.of(slotTag));
             }
         }
     }
 
     // Steals the contents of the NBT given.
-    public void takeContentsFromNBT(NBTTagCompound tag) {
-        NBTTagList tagList = tag.getTagList("Items", new NBTTagCompound().getId());
-        this.contents = NonNullList.withSize(this.getSizeInventory(), ItemStack.EMPTY);
-        for (int i = 0; i < tagList.tagCount(); i++) {
-            NBTTagCompound slotTag = tagList.getCompoundTagAt(i);
+    public void takeContentsFromNBT(CompoundTag tag) {
+        ListTag tagList = tag.getList("Items", Tag.TAG_COMPOUND);
+        this.contents = NonNullList.withSize(this.getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < tagList.size(); i++) {
+            CompoundTag slotTag = tagList.getCompound(i);
             int slot = slotTag.getByte("Slot") & 255;
             if (slot >= 0 && slot < this.contents.size()) {
-                this.contents.set(slot, new ItemStack(slotTag));
+                this.contents.set(slot, ItemStack.of(slotTag));
             }
         }
-        tag.setTag("Items", new NBTTagList());
-        if (tag.hasKey("CustomName")) {
-            this.setCustomNameTag(tag.getString("CustomName"));
+        tag.put("Items", new ListTag());
+        if (tag.contains("CustomName")) {
+            this.setCustomName(Component.literal(tag.getString("CustomName")));
         }
-        tag.removeTag("CustomName");
+        tag.remove("CustomName");
     }
 }

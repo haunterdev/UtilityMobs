@@ -20,7 +20,7 @@
           ]
         ],
         "mapping": {
-          "P": "minecraft:pumpkin[facing=north]",
+          "P": "minecraft:carved_pumpkin[facing=north]",
           "C": "minecraft:cobblestone",
           "0": "minecraft:cobblestone"
         }
@@ -29,7 +29,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:stonelargegolem",
+      "entity": "utilitymobs:stone_large_golem",
       "name": "Large Stone Golem",
       "text": "Health: 16  Armor: 2$(br)Damage: 3  Speed: 2"
     },

@@ -1,9 +1,10 @@
-# Gradle / build artifacts
+# Build
 build/
-out/
 .gradle/
+out/
+classes/
 
-# Runtime
+# Run
 run/
 
 # IDE
@@ -13,7 +14,8 @@ run/
 .classpath
 .project
 .settings/
-*.launch
+bin/
+eclipse/
 
 # OS
 .DS_Store

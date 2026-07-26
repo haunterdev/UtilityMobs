@@ -3,83 +3,100 @@ package toast.utilityMobs.client;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.renderer.OpenGlHelper;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.math.MathHelper;
-import net.minecraftforge.client.event.RenderWorldLastEvent;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import toast.utilityMobs.Properties;
+import toast.utilityMobs._UtilityMobs;
 
-public class HealTextRenderer {
+/**
+ * The floating green "+N" that pops over a golem when something heals it.
+ *
+ * <p>1.12.2 drew this with raw GlStateManager calls in RenderWorldLastEvent. 1.20.1 has no immediate
+ * mode, so the text goes through Font.drawInBatch on a billboard matrix built from the camera, during
+ * RenderLevelStageEvent. The list, the 32 tick lifetime, the fade and the rise are unchanged.
+ */
+@Mod.EventBusSubscriber(modid = _UtilityMobs.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
+public final class HealTextRenderer {
+    private HealTextRenderer() {}
 
     private static final List<HealText> TEXTS = new ArrayList<HealText>();
 
     public static void add(Entity entity, float amount) {
-        if (!toast.utilityMobs.Properties.getBoolean(toast.utilityMobs.Properties.GENERAL, "heal_numbers")) {
+        if (!Properties.getBoolean(Properties.GENERAL, "heal_numbers")) {
             return;
         }
-        TEXTS.add(new HealText(entity, amount));
+        HealTextRenderer.TEXTS.add(new HealText(entity, amount));
     }
 
     @SubscribeEvent
-    public void onClientTick(TickEvent.ClientTickEvent event) {
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
-        Iterator<HealText> iter = TEXTS.iterator();
+        Iterator<HealText> iter = HealTextRenderer.TEXTS.iterator();
         while (iter.hasNext()) {
             HealText text = iter.next();
             text.age++;
-            if (text.age > HealText.MAX_AGE || text.entity.isDead) {
+            if (text.age > HealText.MAX_AGE || !text.entity.isAlive()) {
                 iter.remove();
             }
         }
     }
 
     @SubscribeEvent
-    public void onRenderWorldLast(RenderWorldLastEvent event) {
-        Minecraft mc = Minecraft.getMinecraft();
-        if (mc.player == null || TEXTS.isEmpty()) {
+    public static void onRenderLevelStage(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) {
             return;
         }
-        float partial = event.getPartialTicks();
-        double camX = mc.getRenderManager().viewerPosX;
-        double camY = mc.getRenderManager().viewerPosY;
-        double camZ = mc.getRenderManager().viewerPosZ;
-        for (HealText text : TEXTS) {
-            Entity e = text.entity;
-            float life = ((float)text.age + partial) / (float)HealText.MAX_AGE;
-            double x = e.prevPosX + (e.posX - e.prevPosX) * partial - camX;
-            double y = e.prevPosY + (e.posY - e.prevPosY) * partial - camY + e.height + 0.35D + life * 0.5D;
-            double z = e.prevPosZ + (e.posZ - e.prevPosZ) * partial - camZ;
-            int alpha = MathHelper.clamp((int)((1.0F - life) * 255.0F), 0, 255);
-            drawText(mc, text.label, x, y, z, alpha);
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || HealTextRenderer.TEXTS.isEmpty()) {
+            return;
         }
+        float partial = event.getPartialTick();
+        Camera camera = event.getCamera();
+        double camX = camera.getPosition().x;
+        double camY = camera.getPosition().y;
+        double camZ = camera.getPosition().z;
+        PoseStack poseStack = event.getPoseStack();
+        MultiBufferSource.BufferSource buffer = mc.renderBuffers().bufferSource();
+
+        for (HealText text : HealTextRenderer.TEXTS) {
+            Entity e = text.entity;
+            float life = (text.age + partial) / HealText.MAX_AGE;
+            double x = Mth.lerp(partial, e.xo, e.getX()) - camX;
+            double y = Mth.lerp(partial, e.yo, e.getY()) - camY + e.getBbHeight() + 0.35 + life * 0.5;
+            double z = Mth.lerp(partial, e.zo, e.getZ()) - camZ;
+            int alpha = Mth.clamp((int)((1.0F - life) * 255.0F), 0, 255);
+            HealTextRenderer.drawText(mc, poseStack, buffer, camera, text.label, x, y, z, alpha);
+        }
+        buffer.endBatch();
     }
 
-    private static void drawText(Minecraft mc, String text, double x, double y, double z, int alpha) {
-        GlStateManager.pushMatrix();
-        GlStateManager.translate((float)x, (float)y, (float)z);
-        GlStateManager.rotate(-mc.getRenderManager().playerViewY, 0.0F, 1.0F, 0.0F);
-        GlStateManager.rotate(mc.getRenderManager().playerViewX, 1.0F, 0.0F, 0.0F);
-        GlStateManager.scale(-0.025F, -0.025F, 0.025F);
-        GlStateManager.disableLighting();
-        GlStateManager.depthMask(false);
-        GlStateManager.disableDepth();
-        GlStateManager.enableBlend();
-        GlStateManager.blendFunc(770, 771);
-        OpenGlHelper.setLightmapTextureCoords(OpenGlHelper.lightmapTexUnit, 240.0F, 240.0F);
-        int width = mc.fontRenderer.getStringWidth(text) / 2;
+    private static void drawText(Minecraft mc, PoseStack poseStack, MultiBufferSource buffer, Camera camera, String text, double x, double y, double z, int alpha) {
+        poseStack.pushPose();
+        poseStack.translate(x, y, z);
+        // Face the camera, then flip: the font draws with +y down and the world has +y up.
+        poseStack.mulPose(camera.rotation());
+        poseStack.scale(-0.025F, -0.025F, 0.025F);
+        Font font = mc.font;
+        float width = -font.width(text) / 2.0F;
         int color = (alpha << 24) | 0x55FF55;
-        mc.fontRenderer.drawString(text, -width, 0, color);
-        GlStateManager.enableDepth();
-        GlStateManager.depthMask(true);
-        GlStateManager.enableLighting();
-        GlStateManager.disableBlend();
-        GlStateManager.popMatrix();
+        font.drawInBatch(text, width, 0.0F, color, false, poseStack.last().pose(), buffer,
+            Font.DisplayMode.SEE_THROUGH, 0, LightTexture.FULL_BRIGHT);
+        poseStack.popPose();
     }
 
     private static class HealText {
@@ -94,7 +111,7 @@ public class HealTextRenderer {
                 this.label = "+" + (int)amount;
             }
             else {
-                this.label = "+" + String.format(java.util.Locale.ROOT, "%.1f", Float.valueOf(amount));
+                this.label = "+" + String.format(Locale.ROOT, "%.1f", Float.valueOf(amount));
             }
         }
     }

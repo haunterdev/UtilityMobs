@@ -1,7 +1,7 @@
 {
   "name": "Jack o'Lantern Golem",
   "category": "utilitymobs:block_golems",
-  "icon": "minecraft:lit_pumpkin",
+  "icon": "minecraft:jack_o_lantern",
   "sortnum": 3,
   "pages": [
     {
@@ -17,8 +17,8 @@
           ]
         ],
         "mapping": {
-          "S": "minecraft:skull",
-          "0": "minecraft:lit_pumpkin"
+          "S": "minecraft:skeleton_skull",
+          "0": "minecraft:jack_o_lantern"
         }
       },
       "text": "Top the block with a SKELETON skull (only skeleton skulls build block golems).",
@@ -27,7 +27,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:lanterngolem",
+      "entity": "utilitymobs:lantern_golem",
       "name": "Jack o'Lantern Golem",
       "text": "Health: 10  Armor: 0$(br)Speed: 2.8",
       "scale": 0.5

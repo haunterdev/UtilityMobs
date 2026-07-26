@@ -2,110 +2,68 @@ package toast.utilityMobs.block;
 
 import java.util.List;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.material.Material;
-import net.minecraft.block.state.IBlockState;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.BlockRenderLayer;
-import net.minecraft.util.EnumBlockRenderType;
-import net.minecraft.util.math.AxisAlignedBB;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.IBlockAccess;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.AirBlock;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.phys.AABB;
 
 /**
  * An invisible, non-solid, full-bright block placed by the Jack o'Lantern Golem so it lights the area
  * around itself as it moves (like a real jack o'lantern, light level 15). The golem clears the previous
  * light when it walks; this block also schedules its own removal if no lantern golem is nearby, so stray
  * lights never linger (e.g. after a chunk unloads).
+ *
+ * <p>1.12.2 built this on Material.AIR and overrode a handful of shape and collision methods. 1.20.1
+ * folds all of those into block properties, and AirBlock already supplies the invisible render shape
+ * and the empty collision shape, so extending it is the direct translation.
  */
-public class BlockGolemLight extends Block
+public class BlockGolemLight extends AirBlock
 {
+    /// How often the block re-checks whether its golem is still nearby.
+    private static final int CHECK_INTERVAL = 20;
+
     public BlockGolemLight() {
-        super(Material.AIR);
-        this.setLightLevel(1.0F); // 1.0 == light value 15
-        this.setTickRandomly(false);
-        this.setBlockUnbreakable();
-        this.setTranslationKey("utilitymobs.golem_light");
+        super(BlockBehaviour.Properties.of()
+            .mapColor(MapColor.NONE)
+            .replaceable()
+            .noCollission()
+            .noOcclusion()
+            .noLootTable()
+            .air()
+            .lightLevel(state -> 15)
+            // 1.12.2's setBlockUnbreakable.
+            .strength(-1.0F, 3600000.0F));
     }
 
     @Override
-    public boolean isReplaceable(IBlockAccess world, BlockPos pos) {
-        return true;
-    }
-
-    @Override
-    @SuppressWarnings("deprecation")
-    public boolean isOpaqueCube(IBlockState state) {
-        return false;
-    }
-
-    @Override
-    @SuppressWarnings("deprecation")
-    public boolean isFullCube(IBlockState state) {
-        return false;
-    }
-
-    @Override
-    public boolean canCollideCheck(IBlockState state, boolean hitIfLiquid) {
-        return false;
-    }
-
-    @Override
-    @SuppressWarnings("deprecation")
-    public AxisAlignedBB getCollisionBoundingBox(IBlockState state, IBlockAccess world, BlockPos pos) {
-        return NULL_AABB;
-    }
-
-    @Override
-    public EnumBlockRenderType getRenderType(IBlockState state) {
-        return EnumBlockRenderType.INVISIBLE;
-    }
-
-    @Override
-    public BlockRenderLayer getRenderLayer() {
-        return BlockRenderLayer.SOLID;
-    }
-
-    @Override
-    public void onBlockAdded(World world, BlockPos pos, IBlockState state) {
-        if (!world.isRemote) {
-            world.scheduleUpdate(pos, this, 20);
+    public void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean isMoving) {
+        if (!level.isClientSide) {
+            level.scheduleTick(pos, this, BlockGolemLight.CHECK_INTERVAL);
         }
     }
 
     @Override
-    public void updateTick(World world, BlockPos pos, IBlockState state, java.util.Random rand) {
-        if (world.isRemote)
-            return;
+    public void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         // Remove the light if no lantern golem is still standing here.
-        AxisAlignedBB area = new AxisAlignedBB(pos).grow(2.0);
-        List<EntityLanternGolem> golems = world.getEntitiesWithinAABB(EntityLanternGolem.class, area);
+        AABB area = new AABB(pos).inflate(2.0);
+        List<EntityLanternGolem> golems = level.getEntitiesOfClass(EntityLanternGolem.class, area);
         if (golems.isEmpty()) {
-            world.setBlockToAir(pos);
+            level.removeBlock(pos, false);
         }
         else {
-            world.scheduleUpdate(pos, this, 20);
+            level.scheduleTick(pos, this, BlockGolemLight.CHECK_INTERVAL);
         }
-    }
-
-    // Drop nothing if somehow broken.
-    @Override
-    public int quantityDropped(java.util.Random random) {
-        return 0;
-    }
-
-    @Override
-    @SuppressWarnings("deprecation")
-    public boolean canPlaceBlockAt(World world, BlockPos pos) {
-        IBlockState state = world.getBlockState(pos);
-        return state.getBlock().isReplaceable(world, pos);
     }
 
     /** Helper used by the golem: this position is safe to overwrite with a light. */
-    public static boolean isLightReplaceable(World world, BlockPos pos) {
-        IBlockState state = world.getBlockState(pos);
-        Block block = state.getBlock();
-        return block == net.minecraft.init.Blocks.AIR || block.isReplaceable(world, pos);
+    public static boolean isLightReplaceable(LevelReader level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        return state.isAir() || state.canBeReplaced();
     }
 }

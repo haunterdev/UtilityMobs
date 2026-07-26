@@ -1,108 +1,122 @@
 package toast.utilityMobs.block;
 
-import net.minecraft.entity.item.EntityItem;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Blocks;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemRecord;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.datasync.DataParameter;
-import net.minecraft.network.datasync.DataSerializers;
-import net.minecraft.network.datasync.EntityDataManager;
-import net.minecraft.util.EnumHand;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.RecordItem;
+import net.minecraft.world.level.Level;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import toast.utilityMobs.TargetHelper;
 import toast.utilityMobs._UtilityMobs;
 
 public class EntityJukeboxGolem extends EntityBlockGolem
 {
+    /// Differs from 1.12.2, which left every golem outside the six that already override this
+    /// on the default iron-golem hurt/death sounds. Flavoured by build material: jukebox.
+    @Override
+    protected net.minecraft.world.level.block.SoundType getGolemSoundType() {
+        return net.minecraft.world.level.block.SoundType.WOOD;
+    }
+
     /// The textures for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "block/jukeboxgolem.png");
 
     /// record; The music disc currently playing.
-    private static final DataParameter<String> RECORD = EntityDataManager.createKey(EntityJukeboxGolem.class, DataSerializers.STRING);
+    private static final EntityDataAccessor<String> RECORD = SynchedEntityData.defineId(EntityJukeboxGolem.class, EntityDataSerializers.STRING);
 
     public String lastRecord = "";
 
-    public EntityJukeboxGolem(World world) {
-        super(world);
+    // Registered entity size: 0.9375 x 0.9375 (set via EntityType.Builder.sized at registration).
+    public EntityJukeboxGolem(EntityType<? extends EntityJukeboxGolem> type, Level level) {
+        super(type, level);
         this.setEquipDropChance(0, 2.0F);
         this.texture = EntityJukeboxGolem.TEXTURE;
     }
 
-    // Used to initialize data watcher variables.
+    // Used to initialize data manager variables.
     @Override
-    protected void entityInit() {
-        super.entityInit();
-        this.dataManager.register(RECORD, "");
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(RECORD, "");
     }
 
     /// Get/set functions for the record name.
     public String getRecord() {
-        return this.dataManager.get(RECORD);
+        return this.entityData.get(RECORD);
     }
-    public void setRecord(ItemRecord record) {
+    public void setRecord(RecordItem record) {
         if (record == null) {
             if (!this.getRecord().isEmpty()) {
-                this.dataManager.set(RECORD, "");
+                this.entityData.set(RECORD, "");
             }
         }
         else {
-            String recordName = record.getSound().getSoundName().toString();
+            String recordName = record.getSound().getLocation().toString();
             if (!this.getRecord().equals(recordName)) {
-                this.dataManager.set(RECORD, recordName);
+                this.entityData.set(RECORD, recordName);
             }
         }
     }
 
     @Override
     protected Item getDropItem() {
-        return Item.getItemFromBlock(Blocks.JUKEBOX);
+        return Items.JUKEBOX;
     }
 
     /// Called each tick this entity is alive.
     @Override
-    public void onLivingUpdate() {
-        super.onLivingUpdate();
+    public void aiStep() {
+        super.aiStep();
 
-        if (this.world.isRemote && !this.getRecord().equals(this.lastRecord)) {
+        if (this.level().isClientSide && !this.getRecord().equals(this.lastRecord)) {
             this.lastRecord = this.getRecord();
-            _UtilityMobs.proxy.playRecordGolem(this, this.lastRecord);
+            final String record = this.lastRecord;
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                () -> () -> toast.utilityMobs.client.UMClientNetwork.playRecordGolem(this, record));
         }
     }
 
-    /// Opens this block golem's GUI.
+    /// Opens this block golem's GUI: right-click swaps the disc in and out rather than showing a screen.
     @Override
-    public boolean openGUI(EntityPlayer player) {
-        if (!this.world.isRemote) {
+    public boolean openGUI(Player player) {
+        if (!this.level().isClientSide) {
             ItemStack heldItem = this.getEquipmentInSlot(0);
             if (!heldItem.isEmpty()) {
-                if (!player.capabilities.isCreativeMode) {
+                if (!player.getAbilities().instabuild) {
                     float power = 0.7F;
-                    double xOff = this.rand.nextFloat() * power - power * 0.5;
-                    double yOff = this.rand.nextFloat() * power + (1.0F - power) * 0.2 + 0.6;
-                    double zOff = this.rand.nextFloat() * power - power * 0.5;
+                    double xOff = this.random.nextFloat() * power - power * 0.5;
+                    double yOff = this.random.nextFloat() * power + (1.0F - power) * 0.2 + 0.6;
+                    double zOff = this.random.nextFloat() * power - power * 0.5;
                     ItemStack dropItem = heldItem.copy();
-                    EntityItem entityItem = new EntityItem(this.world, this.posX + xOff, this.posY + yOff, this.posZ + zOff, dropItem);
-                    entityItem.setDefaultPickupDelay();
-                    this.world.spawnEntity(entityItem);
+                    ItemEntity itemEntity = new ItemEntity(this.level(), this.getX() + xOff, this.getY() + yOff, this.getZ() + zOff, dropItem);
+                    itemEntity.setDefaultPickUpDelay();
+                    this.level().addFreshEntity(itemEntity);
                 }
 
                 this.setCurrentItemOrArmor(0, ItemStack.EMPTY);
                 this.setRecord(null);
             }
             else {
-                ItemStack playerHeld = player.getHeldItemMainhand();
-                if (!playerHeld.isEmpty() && playerHeld.getItem() instanceof ItemRecord) {
-                    this.setCurrentItemOrArmor(0, playerHeld.copy());
-                    this.getEquipmentInSlot(0).setCount(1);
-                    this.setRecord((ItemRecord) playerHeld.getItem());
+                ItemStack playerHeld = player.getMainHandItem();
+                if (!playerHeld.isEmpty() && playerHeld.getItem() instanceof RecordItem) {
+                    ItemStack disc = playerHeld.copy();
+                    disc.setCount(1);
+                    this.setCurrentItemOrArmor(0, disc);
+                    this.setRecord((RecordItem)playerHeld.getItem());
 
-                    if (!player.capabilities.isCreativeMode) {
+                    if (!player.getAbilities().instabuild) {
                         playerHeld.shrink(1);
                     }
-                    player.swingArm(EnumHand.MAIN_HAND);
+                    player.swing(InteractionHand.MAIN_HAND);
                 }
             }
         }

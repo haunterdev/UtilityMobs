@@ -17,7 +17,7 @@
           ]
         ],
         "mapping": {
-          "S": "minecraft:skull",
+          "S": "minecraft:skeleton_skull",
           "0": "minecraft:jukebox"
         }
       },
@@ -27,7 +27,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:jukeboxgolem",
+      "entity": "utilitymobs:jukebox_golem",
       "name": "Jukebox Golem",
       "text": "Health: 10  Armor: 0$(br)Speed: 2.8",
       "scale": 0.5

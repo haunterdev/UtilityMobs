@@ -1,15 +1,17 @@
 package toast.utilityMobs.block;
 
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.EntityAILookIdle;
-import net.minecraft.entity.ai.EntityAIWander;
-import net.minecraft.entity.ai.EntityAIWatchClosest;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Blocks;
-import net.minecraft.init.Items;
-import net.minecraft.item.Item;
-import net.minecraft.util.EnumHand;
-import net.minecraft.world.World;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import toast.utilityMobs.TargetHelper;
 import toast.utilityMobs.ai.EntityAIGolemFollow;
 import toast.utilityMobs.golem.EntityUtilityGolem;
@@ -21,63 +23,68 @@ public class EntityBlockGolem extends EntityUtilityGolem
     public static boolean collision = false;
 
     // Save the reference to the follow AI so it can be easily removed or altered.
-    public EntityAIGolemFollow aiFollow = new EntityAIGolemFollow(this, 1.0, 10.0F, 5.0F);
+    public EntityAIGolemFollow aiFollow;
 
-    public EntityBlockGolem(World world) {
-        super(world);
-        this.setSize(0.9375F, 0.9375F);
-        this.tasks.addTask(1, this.sitAI);
-        this.tasks.addTask(2, this.aiFollow);
-        this.tasks.addTask(3, new toast.utilityMobs.ai.EntityAIGolemWander(this, 1.0));
-        this.tasks.addTask(4, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));
-        this.tasks.addTask(4, new EntityAILookIdle(this));
+    // Registered entity size: 0.9375 x 0.9375 (set via EntityType.Builder.sized at registration).
+    public EntityBlockGolem(EntityType<? extends EntityBlockGolem> type, Level level) {
+        super(type, level);
+    }
+
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+        this.aiFollow = new EntityAIGolemFollow(this, 1.0, 10.0F, 5.0F);
+        this.goalSelector.addGoal(1, this.sitAI());
+        this.goalSelector.addGoal(2, this.aiFollow);
+        this.goalSelector.addGoal(3, new toast.utilityMobs.ai.EntityAIGolemWander(this, 1.0));
+        this.goalSelector.addGoal(4, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
     }
 
     /// Solid (standable) when the golems.block_collision config is on - lets players build block-golem
-    /// walkways. Mirrors EntityTurretGolem.getCollisionBoundingBox; null (vanilla default) means pass-through.
+    /// walkways. False (vanilla default) means pass-through.
     @Override
-    public net.minecraft.util.math.AxisAlignedBB getCollisionBoundingBox() {
-        return EntityBlockGolem.collision ? this.getEntityBoundingBox() : super.getCollisionBoundingBox();
+    public boolean canBeCollidedWith() {
+        return EntityBlockGolem.collision && this.isAlive();
     }
 
     /// Initializes this entity's attributes.
-    @Override
-    protected void applyEntityAttributes() {
-        super.applyEntityAttributes();
-        this.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).setBaseValue(10.0);
+    public static AttributeSupplier.Builder createAttributes() {
+        return EntityUtilityGolem.createAttributes()
+            .add(Attributes.MAX_HEALTH, 10.0);
     }
 
     @Override
     protected Item getDropItem() {
-        return Item.getItemFromBlock(Blocks.CHEST);
+        return Blocks.CHEST.asItem();
     }
 
     @Override
     protected void dropFewItems(boolean recentlyHit, int looting, float dropChance) {
         if (recentlyHit) {
-            this.dropItem(this.getDropItem(), 1);
-            if (this.rand.nextFloat() < dropChance / 4.0F) {
-                this.dropItem(Items.SKULL, 1);
+            this.spawnAtLocation(this.getDropItem());
+            if (this.random.nextFloat() < dropChance / 4.0F) {
+                this.spawnAtLocation(Items.SKELETON_SKULL);
             }
         }
     }
 
     @Override
-    public boolean processInteract(EntityPlayer player, EnumHand hand) {
+    public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (this.canInteract(player)) {
-            if (player.isSneaking()) {
-                this.sitAI.sit = !this.isSitting();
-                if (!this.sitAI.sit) {
+            if (player.isShiftKeyDown()) {
+                this.sitAI().sit = !this.isSitting();
+                if (!this.sitAI().sit) {
                     this.setClosed();
                 }
             }
-            else if (this.tryHealFromHeld(player, hand, player.getHeldItem(hand))) {
-                return true;
+            else if (this.tryHealFromHeld(player, hand, player.getItemInHand(hand))) {
+                return InteractionResult.sidedSuccess(this.level().isClientSide);
             }
             else if (this.openPrimaryGUI(player))
-                return true;
+                return InteractionResult.sidedSuccess(this.level().isClientSide);
         }
-        return super.processInteract(player, hand);
+        return super.mobInteract(player, hand);
     }
 
     /// Called when this block golem is told to get up.
@@ -87,19 +94,19 @@ public class EntityBlockGolem extends EntityUtilityGolem
 
     /// The GUI opened by a plain (non-sneak) right-click. Defaults to this golem's storage GUI; smart
     /// container golems override this to open their configuration menu instead (EntityContainerGolem).
-    public boolean openPrimaryGUI(EntityPlayer player) {
+    public boolean openPrimaryGUI(Player player) {
         return this.openGUI(player);
     }
 
     /// Opens this block golem's GUI.
-    public boolean openGUI(EntityPlayer player) {
+    public boolean openGUI(Player player) {
         return false;
     }
 
     @Override
-    public boolean canInteract(EntityPlayer player) {
-        if (player.isSneaking())
-            return this.getOwnerName().isEmpty() || this.getOwnerName().equals(player.getName()) || this.targetHelper.playerHasPermission(player.getName(), TargetHelper.PERMISSION_TARGET | TargetHelper.PERMISSION_USE);
-        return super.canInteract(player) && player.getDistanceSq(this) <= 64.0;
+    public boolean canInteract(Player player) {
+        if (player.isShiftKeyDown())
+            return this.getOwnerName().isEmpty() || this.getOwnerName().equals(player.getScoreboardName()) || this.targetHelper.playerHasPermission(player.getScoreboardName(), TargetHelper.PERMISSION_TARGET | TargetHelper.PERMISSION_USE);
+        return super.canInteract(player) && player.distanceToSqr(this) <= 64.0;
     }
 }

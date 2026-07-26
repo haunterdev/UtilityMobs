@@ -1,35 +1,41 @@
 package toast.utilityMobs.colossal;
 
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.EntityAILookIdle;
-import net.minecraft.entity.ai.EntityAIWander;
-import net.minecraft.entity.ai.EntityAIWatchClosest;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Items;
-import net.minecraft.item.Item;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import toast.utilityMobs._UtilityMobs;
+import toast.utilityMobs.ai.EntityAIGolemWander;
 
 public class EntityArmorColossus extends EntityColossalGolem
 {
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "colossal/armorcolossus.png");
 
-    public EntityArmorColossus(World world) {
-        super(world);
+    public EntityArmorColossus(EntityType<? extends EntityArmorColossus> type, Level level) {
+        super(type, level);
         this.texture = EntityArmorColossus.TEXTURE;
-        this.tasks.addTask(2, new toast.utilityMobs.ai.EntityAIGolemWander(this, 0.8));
-        this.tasks.addTask(3, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));
-        this.tasks.addTask(3, new EntityAILookIdle(this));
+    }
+
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+        this.goalSelector.addGoal(2, new EntityAIGolemWander(this, 0.8));
+        this.goalSelector.addGoal(3, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
     }
 
     /// Initializes this entity's attributes.
-    @Override
-    protected void applyEntityAttributes() {
-        super.applyEntityAttributes();
-        this.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).setBaseValue(500.0);
-        this.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).setBaseValue(0.2);
-        this.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE).setBaseValue(18.0);
+    public static AttributeSupplier.Builder createAttributes() {
+        return EntityColossalGolem.createAttributes()
+            .add(Attributes.MAX_HEALTH, 500.0)
+            .add(Attributes.MOVEMENT_SPEED, 0.2)
+            .add(Attributes.ATTACK_DAMAGE, 18.0);
     }
 
     @Override
@@ -40,8 +46,8 @@ public class EntityArmorColossus extends EntityColossalGolem
     @Override
     protected void dropFewItems(boolean recentlyHit, int looting, float dropChance) {
         super.dropFewItems(recentlyHit, looting, dropChance);
-        for (int i = this.rand.nextInt(25) + 3; i-- > 0;) {
-            this.dropItem(this.getDropItem(), 1);
+        for (int i = this.random.nextInt(25) + 3; i-- > 0;) {
+            this.spawnAtLocation(this.getDropItem());
         }
     }
 }

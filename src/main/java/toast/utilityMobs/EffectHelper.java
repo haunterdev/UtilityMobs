@@ -1,73 +1,72 @@
 package toast.utilityMobs;
 
+import java.util.Map;
 import java.util.Random;
 
-import toast.utilityMobs.network.MessageExplosion;
-
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLiving;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.ai.EntityAITasks.EntityAITaskEntry;
-import net.minecraft.entity.passive.EntitySheep;
-import net.minecraft.init.Blocks;
-import net.minecraft.init.Items;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemArmor;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.EnumDyeColor;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.nbt.NBTTagString;
-import net.minecraft.potion.Potion;
-import net.minecraft.potion.PotionEffect;
-import net.minecraft.world.Explosion;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.animal.Sheep;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.DyeableLeatherItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.Explosion;
+import net.minecraft.world.level.block.Blocks;
 
 public abstract class EffectHelper
 {
     // Clears the entity's AI tasks.
-    public static void clearAI(EntityLiving entity) {
-        EntityAITaskEntry[] oldAI = entity.tasks.taskEntries.toArray(new EntityAITaskEntry[0]);
-        int length = oldAI.length;
-        for (int i = 0; i < length; i++) {
-            entity.tasks.removeTask(oldAI[i].action);
-        }
+    public static void clearAI(Mob entity) {
+        entity.goalSelector.removeAllGoals(goal -> true);
     }
 
     // Applies the potion's effect on the entity. If the potion is already active, its duration is increased up to the given duration and its amplifier is increased by the given amplifier + 1.
-    public static void stackEffect(EntityLivingBase entity, Potion potion, int duration, int amplifier) {
-        if (entity.isPotionActive(potion)) {
-            PotionEffect potionEffect = entity.getActivePotionEffect(potion);
-            entity.addPotionEffect(new PotionEffect(potion, Math.max(duration, potionEffect.getDuration()), potionEffect.getAmplifier() + amplifier + 1));
+    public static void stackEffect(LivingEntity entity, MobEffect potion, int duration, int amplifier) {
+        if (entity.hasEffect(potion)) {
+            MobEffectInstance potionEffect = entity.getEffect(potion);
+            entity.addEffect(new MobEffectInstance(potion, Math.max(duration, potionEffect.getDuration()), potionEffect.getAmplifier() + amplifier + 1));
         }
         else {
-            entity.addPotionEffect(new PotionEffect(potion, duration, amplifier));
+            entity.addEffect(new MobEffectInstance(potion, duration, amplifier));
         }
     }
 
     // Applies the potion's effect on the entity. If the potion is already active, its duration is increased up to the given duration and its amplifier is increased by the given amplifier + 1 up to the given amplifierMax.
-    public static void stackEffect(EntityLivingBase entity, Potion potion, int duration, int amplifier, int amplifierMax) {
+    public static void stackEffect(LivingEntity entity, MobEffect potion, int duration, int amplifier, int amplifierMax) {
         if (amplifierMax < 0) {
             EffectHelper.stackEffect(entity, potion, duration, amplifier);
             return;
         }
-        if (entity.isPotionActive(potion)) {
-            PotionEffect potionEffect = entity.getActivePotionEffect(potion);
-            entity.addPotionEffect(new PotionEffect(potion, Math.max(duration, potionEffect.getDuration()), Math.min(amplifierMax, potionEffect.getAmplifier() + amplifier + 1)));
+        if (entity.hasEffect(potion)) {
+            MobEffectInstance potionEffect = entity.getEffect(potion);
+            entity.addEffect(new MobEffectInstance(potion, Math.max(duration, potionEffect.getDuration()), Math.min(amplifierMax, potionEffect.getAmplifier() + amplifier + 1)));
         }
         else if (amplifier >= 0) {
-            entity.addPotionEffect(new PotionEffect(potion, duration, Math.min(amplifier, amplifierMax)));
+            entity.addEffect(new MobEffectInstance(potion, duration, Math.min(amplifier, amplifierMax)));
         }
     }
 
-    // Causes the itemStack to glow as if it is enchanted.
+    // Causes the itemStack to glow as if it is enchanted. (Modern glint trick: an
+    // "Enchantments" list holding one empty compound - counts as enchanted, applies nothing.)
     public static void setItemGlowing(ItemStack itemStack) {
-        if (itemStack.getTagCompound() == null) {
-            itemStack.setTagCompound(new NBTTagCompound());
-        }
-        if (!itemStack.getTagCompound().hasKey("ench")) {
-            itemStack.getTagCompound().setTag("ench", new NBTTagList());
+        CompoundTag tag = itemStack.getOrCreateTag();
+        if (!tag.contains("Enchantments", Tag.TAG_LIST)) {
+            ListTag ench = new ListTag();
+            ench.add(new CompoundTag());
+            tag.put("Enchantments", ench);
         }
     }
 
@@ -77,14 +76,14 @@ public abstract class EffectHelper
     }
     public static void setItemName(ItemStack itemStack, String name) {
         if (itemStack != null && !itemStack.isEmpty()) {
-            itemStack.setStackDisplayName(name);
+            itemStack.setHoverName(Component.literal(name));
         }
     }
 
     // Removes all info text from an item stack.
     public static void clearItemText(ItemStack itemStack) {
-        if (itemStack.getTagCompound() != null && itemStack.getTagCompound().hasKey("display")) {
-            itemStack.getTagCompound().getCompoundTag("display").removeTag("Lore");
+        if (itemStack.getTag() != null && itemStack.getTag().contains("display")) {
+            itemStack.getTag().getCompound("display").remove("Lore");
         }
     }
 
@@ -105,55 +104,39 @@ public abstract class EffectHelper
         EffectHelper.addItemText(itemStack, text);
     }
     public static void addItemText(ItemStack itemStack, String... text) {
-        if (itemStack.getTagCompound() == null) {
-            itemStack.setTagCompound(new NBTTagCompound());
+        CompoundTag tag = itemStack.getOrCreateTag();
+        if (!tag.contains("display", Tag.TAG_COMPOUND)) {
+            tag.put("display", new CompoundTag());
         }
-        if (!itemStack.getTagCompound().hasKey("display")) {
-            itemStack.getTagCompound().setTag("display", new NBTTagCompound());
+        CompoundTag displayTag = tag.getCompound("display");
+        if (!displayTag.contains("Lore", Tag.TAG_LIST)) {
+            displayTag.put("Lore", new ListTag());
         }
-        NBTTagCompound displayTag = itemStack.getTagCompound().getCompoundTag("display");
-        if (!displayTag.hasKey("Lore")) {
-            displayTag.setTag("Lore", new NBTTagList());
-        }
-        NBTTagList lore = displayTag.getTagList("Lore", new NBTTagString("").getId());
-        for (int i = 0; i < text.length; i++) {
-            lore.appendTag(new NBTTagString(text[i]));
+        ListTag lore = displayTag.getList("Lore", Tag.TAG_STRING);
+        for (String line : text) {
+            // Lore lines are serialized text components in 1.20.1.
+            lore.add(StringTag.valueOf(Component.Serializer.toJson(Component.literal(line))));
         }
     }
 
     // Applies the enchantment to the itemStack at the given level or changes an existing enchantment's level.
     public static void overrideEnchantment(ItemStack itemStack, Enchantment enchantment, int level) {
-        if (itemStack.getTagCompound() == null) {
-            itemStack.setTagCompound(new NBTTagCompound());
-        }
-        if (!itemStack.getTagCompound().hasKey("ench")) {
-            itemStack.getTagCompound().setTag("ench", new NBTTagList());
-        }
-        int enchId = Enchantment.getEnchantmentID(enchantment);
-        NBTTagList enchList = (NBTTagList)itemStack.getTagCompound().getTag("ench");
-        NBTTagCompound enchTag;
-        for (int i = enchList.tagCount(); i-- > 0;) {
-            enchTag = enchList.getCompoundTagAt(i);
-            if (enchTag.getShort("id") != enchId) {
-                continue;
-            }
-            enchTag.setShort("lvl", (byte)level);
-            return;
-        }
-        enchTag = new NBTTagCompound();
-        enchTag.setShort("id", (short)enchId);
-        enchTag.setShort("lvl", (byte)level);
-        enchList.appendTag(enchTag);
+        Map<Enchantment, Integer> enchants = EnchantmentHelper.getEnchantments(itemStack);
+        enchants.put(enchantment, level);
+        EnchantmentHelper.setEnchantments(enchants, itemStack);
     }
 
     // Applies the enchantment to the itemStack at the given level. Called by all other enchantItem methods to do the actual enchanting.
     public static void enchantItem(ItemStack itemStack, Enchantment enchantment, int level) {
-        itemStack.addEnchantment(enchantment, level);
+        itemStack.enchant(enchantment, level);
     }
 
-    // Applies the enchantment with the given enchantment id and level.
+    // Applies the enchantment with the given (registry-numeric) enchantment id and level.
     public static void enchantItem(ItemStack itemStack, int enchantmentID, int level) {
-        EffectHelper.enchantItem(itemStack, Enchantment.getEnchantmentByID(enchantmentID), level);
+        Enchantment ench = BuiltInRegistries.ENCHANTMENT.byId(enchantmentID);
+        if (ench != null) {
+            EffectHelper.enchantItem(itemStack, ench, level);
+        }
     }
 
     // Randomly enchants the itemStack based on the level (identical to using an enchantment table).
@@ -161,18 +144,21 @@ public abstract class EffectHelper
         return EffectHelper.enchantItem(_UtilityMobs.random, itemStack, level);
     }
     public static boolean enchantItem(Random random, ItemStack itemStack, int level) {
-        if (level <= 0 || itemStack == null || itemStack.isEmpty() || !itemStack.isItemEnchantable())
+        return EffectHelper.enchantItem(RandomSource.create(random.nextLong()), itemStack, level);
+    }
+    public static boolean enchantItem(RandomSource random, ItemStack itemStack, int level) {
+        if (level <= 0 || itemStack == null || itemStack.isEmpty() || !itemStack.isEnchantable())
             return false;
-        EnchantmentHelper.addRandomEnchantment(random, itemStack, level, false);
+        EnchantmentHelper.enchantItem(random, itemStack, level, false);
         return true;
     }
 
     // Dyes the given itemStack. Only works on leather armor, returns true if it works.
     public static boolean dye(ItemStack itemStack, String colorName) {
         String norm = colorName.toLowerCase().replace("_", "");
-        for (EnumDyeColor color : EnumDyeColor.values()) {
+        for (DyeColor color : DyeColor.values()) {
             if (norm.equals(color.getName().replace("_", "")))
-                return EffectHelper.dye(itemStack, (byte)color.getDyeDamage());
+                return EffectHelper.dye(itemStack, (byte)color.getId());
         }
         _UtilityMobs.debugException("Tried to dye with an invalid dye name (" + colorName + ")! Valid dye names: black, red, green, brown, blue, purple, cyan, silver, gray, pink, lime, yellow, lightBlue, magenta, orange, white.");
         return false;
@@ -182,7 +168,7 @@ public abstract class EffectHelper
             _UtilityMobs.debugException("Tried to dye with an invalid dye index (" + colorIndex + ")!");
             return false;
         }
-        float[] rgb = EntitySheep.getDyeRgb(EnumDyeColor.byDyeDamage(colorIndex));
+        float[] rgb = Sheep.getColorArray(DyeColor.byId(colorIndex));
         return EffectHelper.dye(itemStack, (int)(rgb[0] * 255.0F), (int)(rgb[1] * 255.0F), (int)(rgb[2] * 255.0F));
     }
     public static boolean dye(ItemStack itemStack, int red, int green, int blue) {
@@ -197,57 +183,58 @@ public abstract class EffectHelper
             _UtilityMobs.debugException("Tried to dye with an invalid color value (" + color + ")!");
             return false;
         }
-        try {
-            ((ItemArmor)itemStack.getItem()).setColor(itemStack, color); /// Dyes the armor if it is leather.
+        if (itemStack.getItem() instanceof DyeableLeatherItem dyeable) {
+            dyeable.setColor(itemStack, color);
+            return true;
         }
-        catch (Exception ex) {
-            return false;
-        }
-        return true;
+        return false;
     }
 
     // Returns true if the itemstack is a lava or fire weapon.
     public static boolean isFireWeapon(ItemStack itemStack) {
         if (itemStack == null || itemStack.isEmpty())
             return false;
-        return itemStack.getItem() == Items.FLINT_AND_STEEL || itemStack.getItem() == Item.getItemFromBlock(Blocks.FIRE);
+        return itemStack.getItem() == Items.FLINT_AND_STEEL || itemStack.getItem() == Blocks.FIRE.asItem();
     }
     public static boolean isLavaWeapon(ItemStack itemStack) {
         if (itemStack == null || itemStack.isEmpty())
             return false;
-        return itemStack.getItem() == Items.LAVA_BUCKET || itemStack.getItem() == Item.getItemFromBlock(Blocks.LAVA);
+        return itemStack.getItem() == Items.LAVA_BUCKET || itemStack.getItem() == Blocks.LAVA.asItem();
     }
 
     // Creates an instance of an explosion at the exploder with the given power.
     public static Explosion explosion(Entity exploder, float power) {
-        boolean mobGriefing = exploder.world.getGameRules().getBoolean("mobGriefing");
-        return new Explosion(exploder.world, exploder, exploder.posX, exploder.posY, exploder.posZ, power, false, mobGriefing);
+        boolean mobGriefing = exploder.level().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
+        return EffectHelper.explosion(exploder, power, false, mobGriefing);
     }
 
-    // Creates an explosion at the exploder with explicit flame/terrain flags (1.12.2 sets these at construction).
+    // Creates an explosion at the exploder with explicit flame/terrain flags.
     private static Explosion explosion(Entity exploder, float power, boolean flaming, boolean smoking) {
-        return new Explosion(exploder.world, exploder, exploder.posX, exploder.posY, exploder.posZ, power, flaming, smoking);
+        return new Explosion(exploder.level(), exploder, exploder.getX(), exploder.getY(), exploder.getZ(), power, flaming,
+                smoking ? Explosion.BlockInteraction.DESTROY_WITH_DECAY : Explosion.BlockInteraction.KEEP);
     }
 
     /// Causes a standard explosion at the exploder with the given power.
     public static Explosion explode(Entity exploder, float power) {
-        boolean mobGriefing = exploder.world.getGameRules().getBoolean("mobGriefing");
+        boolean mobGriefing = exploder.level().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
         return EffectHelper.explode(exploder, EffectHelper.explosion(exploder, power, false, mobGriefing), mobGriefing, power);
     }
 
     /// Triggers an explosion that damages entities, and blocks if smoking is true.
     private static Explosion explode(Entity exploder, Explosion explosion, boolean smoking, float power) {
-        explosion.doExplosionA();
-        explosion.doExplosionB(true);
-        if (!exploder.world.isRemote) {
-            _UtilityMobs.CHANNEL.sendToDimension(new MessageExplosion(power, exploder.posX, exploder.posY, exploder.posZ, smoking, explosion.getAffectedBlockPositions()), exploder.dimension);
+        explosion.explode();
+        explosion.finalizeExplosion(true);
+        if (!exploder.level().isClientSide) {
+            toast.utilityMobs.network.UMChannel.sendToDimension(
+                new toast.utilityMobs.network.MessageExplosion(power, exploder.getX(), exploder.getY(), exploder.getZ(), smoking, explosion.getToBlow()),
+                exploder.level().dimension());
         }
         return explosion;
     }
 
     /// Causes a fiery explosion at the exploder with the given power.
     public static Explosion explodeFire(Entity exploder, float power) {
-        boolean mobGriefing = exploder.world.getGameRules().getBoolean("mobGriefing");
+        boolean mobGriefing = exploder.level().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING);
         return EffectHelper.explode(exploder, EffectHelper.explosion(exploder, power, true, mobGriefing), mobGriefing, power);
     }
 

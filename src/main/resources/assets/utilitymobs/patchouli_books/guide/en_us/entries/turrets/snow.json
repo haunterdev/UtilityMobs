@@ -1,7 +1,7 @@
 {
   "name": "Snow Turret",
   "category": "utilitymobs:turrets",
-  "icon": "minecraft:snow",
+  "icon": "minecraft:snow_block",
   "sortnum": 0,
   "pages": [
     {
@@ -21,8 +21,8 @@
         ],
         "mapping": {
           "D": "minecraft:dispenser",
-          "F": "minecraft:fence",
-          "0": "minecraft:snow"
+          "F": "minecraft:oak_fence",
+          "0": "minecraft:snow_block"
         }
       },
       "text": "",
@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:snowturret",
+      "entity": "utilitymobs:snow_turret",
       "name": "Snow Turret",
       "text": "Health: 20  Armor: 0$(br)Damage: 0  Range: 10$(br)Shots: 1  Atk speed: 10"
     }

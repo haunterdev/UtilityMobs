@@ -20,7 +20,7 @@
           ]
         ],
         "mapping": {
-          "P": "minecraft:pumpkin[facing=north]",
+          "P": "minecraft:carved_pumpkin[facing=north]",
           "C": "minecraft:cobblestone",
           "0": "minecraft:cobblestone"
         }
@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:stonegolem",
+      "entity": "utilitymobs:stone_golem",
       "name": "Stone Golem",
       "text": "Health: 10  Armor: 2$(br)Damage: 2  Speed: 2.4"
     },

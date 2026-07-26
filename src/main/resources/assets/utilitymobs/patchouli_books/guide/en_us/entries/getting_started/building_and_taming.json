@@ -1,7 +1,7 @@
 {
   "name": "Building & Taming",
   "category": "utilitymobs:getting_started",
-  "icon": "minecraft:pumpkin",
+  "icon": "minecraft:carved_pumpkin",
   "sortnum": 1,
   "pages": [
     { "type": "text", "text": "Build a mob in the world by stacking the blocks shown in its entry. Most golems finish with a $(item)Pumpkin$() on top; block golems use a $(item)Skeleton Skull$(); turrets sit on a $(item)Fence$() over their base block.$(br2)Once the last block is placed, the structure springs to life, owned by you." },

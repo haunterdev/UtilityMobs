@@ -1,66 +1,82 @@
 package toast.utilityMobs.block;
 
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.InventoryPlayer;
-import net.minecraft.inventory.Container;
-import net.minecraft.inventory.Slot;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.Container;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import toast.utilityMobs.setup.ModMenus;
 
-public class ContainerLanternGolem extends Container
+/// The lantern golem's 3x3 light store.
+public class ContainerLanternGolem extends AbstractContainerMenu
 {
-    private final EntityLanternGolem golem;
+    /// Slots belonging to the golem rather than the player.
+    private static final int GOLEM_SLOTS = 9;
 
-    public ContainerLanternGolem(InventoryPlayer inventory, EntityLanternGolem lanternGolem) {
+    private final EntityLanternGolem golem;
+    private final Container container;
+
+    public ContainerLanternGolem(int containerId, Inventory inventory, EntityLanternGolem lanternGolem) {
+        super(ModMenus.LANTERN_GOLEM.get(), containerId);
         this.golem = lanternGolem;
-        this.golem.openInventory(inventory.player);
+        // The golem is the inventory. If it has already despawned client-side, back onto a throwaway so
+        // the slots still have something to point at until stillValid closes the screen.
+        this.container = lanternGolem == null ? new SimpleContainer(ContainerLanternGolem.GOLEM_SLOTS) : lanternGolem;
+        if (this.golem != null) {
+            this.golem.startOpen(inventory.player);
+        }
         int i, j;
         for (i = 0; i < 3; ++i) {
             for (j = 0; j < 3; ++j) {
-                this.addSlotToContainer(new Slot(lanternGolem, j + i * 3, 62 + j * 18, 17 + i * 18));
+                this.addSlot(new Slot(this.container, j + i * 3, 62 + j * 18, 17 + i * 18));
             }
         }
         for (i = 0; i < 3; ++i) {
             for (j = 0; j < 9; ++j) {
-                this.addSlotToContainer(new Slot(inventory, j + i * 9 + 9, 8 + j * 18, 84 + i * 18));
+                this.addSlot(new Slot(inventory, j + i * 9 + 9, 8 + j * 18, 84 + i * 18));
             }
         }
         for (i = 0; i < 9; ++i) {
-            this.addSlotToContainer(new Slot(inventory, i, 8 + i * 18, 142));
+            this.addSlot(new Slot(inventory, i, 8 + i * 18, 142));
         }
     }
 
     @Override
-    public void onContainerClosed(EntityPlayer player) {
-        super.onContainerClosed(player);
-        this.golem.closeInventory(player);
+    public void removed(Player player) {
+        super.removed(player);
+        if (this.golem != null) {
+            this.golem.stopOpen(player);
+        }
     }
 
     @Override
-    public boolean canInteractWith(EntityPlayer player) {
-        return this.golem.isUsableByPlayer(player);
+    public boolean stillValid(Player player) {
+        return this.golem != null && this.golem.stillValid(player);
     }
 
     @Override
-    public ItemStack transferStackInSlot(EntityPlayer player, int slotIndex) {
+    public ItemStack quickMoveStack(Player player, int slotIndex) {
         ItemStack itemStack = ItemStack.EMPTY;
-        Slot slot = this.inventorySlots.get(slotIndex);
-        if (slot != null && slot.getHasStack()) {
-            ItemStack itemStackInSlot = slot.getStack();
+        Slot slot = this.slots.get(slotIndex);
+        if (slot != null && slot.hasItem()) {
+            ItemStack itemStackInSlot = slot.getItem();
             itemStack = itemStackInSlot.copy();
-            if (slotIndex >= 9) {
-                if (!this.mergeItemStack(itemStackInSlot, 0, 9, false))
+            if (slotIndex >= ContainerLanternGolem.GOLEM_SLOTS) {
+                if (!this.moveItemStackTo(itemStackInSlot, 0, 9, false))
                     return ItemStack.EMPTY;
             }
             else {
-                if (!this.mergeItemStack(itemStackInSlot, 9, 45, false))
+                if (!this.moveItemStackTo(itemStackInSlot, 9, 45, false))
                     return ItemStack.EMPTY;
             }
 
             if (itemStackInSlot.isEmpty()) {
-                slot.putStack(ItemStack.EMPTY);
+                slot.set(ItemStack.EMPTY);
             }
             else {
-                slot.onSlotChanged();
+                slot.setChanged();
             }
 
             if (itemStackInSlot.getCount() == itemStack.getCount())

@@ -1,44 +1,30 @@
 package toast.utilityMobs.client.renderer;
 
-import net.minecraft.client.model.ModelBiped;
-import net.minecraft.client.model.ModelSkeleton;
-import net.minecraft.client.model.ModelZombie;
-import net.minecraft.client.renderer.entity.RenderBiped;
-import net.minecraft.client.renderer.entity.RenderManager;
-import net.minecraft.client.renderer.entity.layers.LayerBipedArmor;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.HumanoidMobRenderer;
+import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
+import net.minecraft.resources.ResourceLocation;
 import toast.utilityMobs.golem.EntityUtilityGolem;
 
-@SideOnly(Side.CLIENT)
-public class RenderGolem extends RenderBiped<EntityUtilityGolem>
+/**
+ * The default utility golem renderer: a humanoid body wearing whatever armor the golem is equipped
+ * with. 1.12.2 had to attach the armor layer by hand because RenderBiped only added the held-item
+ * layer; the same is true of {@link HumanoidMobRenderer} in 1.20.1, so the layer is added here.
+ */
+public class RenderGolem extends HumanoidMobRenderer<EntityUtilityGolem, HumanoidModel<EntityUtilityGolem>>
 {
-    public RenderGolem(RenderManager renderManager) {
-        this(renderManager, new ModelBiped());
-    }
-
-    public RenderGolem(RenderManager renderManager, ModelBiped model) {
-        super(renderManager, model, 0.5F);
-        // 1.12.2 RenderBiped only adds the held-item layer; armor must be added here.
-        // Faithful to 1.7.10 RenderGolem.func_82421_b(): zombie/skeleton models use zombie armor models.
-        this.addLayer(new LayerBipedArmor(this) {
-            @Override
-            protected void initArmor() {
-                if (RenderGolem.this.getMainModel() instanceof ModelZombie || RenderGolem.this.getMainModel() instanceof ModelSkeleton) {
-                    this.modelLeggings = new ModelZombie(0.5F, false);
-                    this.modelArmor = new ModelZombie(1.0F, false);
-                }
-                else {
-                    this.modelLeggings = new ModelBiped(0.5F);
-                    this.modelArmor = new ModelBiped(1.0F);
-                }
-            }
-        });
+    public RenderGolem(EntityRendererProvider.Context ctx, HumanoidModel<EntityUtilityGolem> model) {
+        super(ctx, model, 0.5F);
+        this.addLayer(new HumanoidArmorLayer<>(this,
+            new HumanoidModel<>(ctx.bakeLayer(ModelLayers.ZOMBIE_INNER_ARMOR)),
+            new HumanoidModel<>(ctx.bakeLayer(ModelLayers.ZOMBIE_OUTER_ARMOR)),
+            ctx.getModelManager()));
     }
 
     @Override
-    protected ResourceLocation getEntityTexture(EntityUtilityGolem entity) {
+    public ResourceLocation getTextureLocation(EntityUtilityGolem entity) {
         return entity.getTexture();
     }
 }

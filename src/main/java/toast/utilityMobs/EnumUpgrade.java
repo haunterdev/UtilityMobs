@@ -1,12 +1,14 @@
 package toast.utilityMobs;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.projectile.EntityArrow;
-import net.minecraft.init.Items;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.EnumParticleTypes;
-import net.minecraft.world.WorldServer;
+import net.minecraft.core.particles.ItemParticleOption;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 public enum EnumUpgrade
 {
@@ -55,68 +57,60 @@ public enum EnumUpgrade
     }
 
     // Applies this arrow effect to the arrow and initializes arrow stats.
-    // NOTE: deliberately if/else, not switch(this) - an enum switch makes the compiler emit a synthetic
-    // EnumUpgrade$1 switch-map class that fails to load under the 1.12.2 LaunchClassLoader/coremod
-    // transformers (NoClassDefFoundError -> NPE), crashing turret ranged attacks.
-    public void applyToArrow(EntityArrow arrow) {
+    public void applyToArrow(AbstractArrow arrow) {
         if (this == EXPLOSIVE) {
-            arrow.setDamage(arrow.getDamage() - 1.0);
+            arrow.setBaseDamage(arrow.getBaseDamage() - 1.0);
         }
         else if (this == FIRE) {
-            arrow.setDamage(arrow.getDamage() - 1.0);
-            arrow.setFire(100);
+            arrow.setBaseDamage(arrow.getBaseDamage() - 1.0);
+            arrow.setSecondsOnFire(100);
         }
         else if (this == FIRE_EXPLOSIVE) {
-            arrow.setDamage(arrow.getDamage() - 2.0);
-            arrow.setFire(100);
+            arrow.setBaseDamage(arrow.getBaseDamage() - 2.0);
+            arrow.setSecondsOnFire(100);
         }
         else if (this == KILLER) {
-            arrow.setDamage(arrow.getDamage() * 1.5 + 1.0);
+            arrow.setBaseDamage(arrow.getBaseDamage() * 1.5 + 1.0);
         }
-        if (arrow.getDamage() <= 0.0) {
-            arrow.setDamage(Double.MIN_VALUE);
+        if (arrow.getBaseDamage() <= 0.0) {
+            arrow.setBaseDamage(Double.MIN_VALUE);
         }
         this.applyTo(arrow);
     }
 
     // Applies this arrow effect to the entity.
     public void applyTo(Entity entity) {
-        entity.getEntityData().setBoolean("UM|" + this.upgradeName, true);
+        entity.getPersistentData().putBoolean("UM|" + this.upgradeName, true);
     }
 
     // Safely returns the arrow effect with the given ID.
     public boolean isApplied(Entity entity) {
-        return entity.getEntityData().getBoolean("UM|" + this.upgradeName);
+        return entity.getPersistentData().getBoolean("UM|" + this.upgradeName);
     }
 
     // Spawns a burst of upgrade-themed particles at the given point (server-side; replicated to clients).
     // The particle correlates with the upgrade: ender pearl -> enderman teleport (PORTAL), the fiery
     // upgrades -> flame, everything else -> the upgrade item itself shattering (so a feather upgrade
     // poofs feathers, a slime ball spits slime, and so on).
-    // NOTE: deliberately if/else, not switch(this) - see applyToArrow for why an enum switch crashes here.
-    public void spawnEquipParticles(WorldServer world, double x, double y, double z) {
-        EnumParticleTypes type;
-        int[] args;
+    public void spawnEquipParticles(ServerLevel world, double x, double y, double z) {
+        ParticleOptions type;
         if (this == SIGHT) {
-            type = EnumParticleTypes.PORTAL;
-            args = new int[0];
+            type = ParticleTypes.PORTAL;
         }
         else if (this == FIRE || this == FIRE_EXPLOSIVE) {
-            type = EnumParticleTypes.FLAME;
-            args = new int[0];
+            type = ParticleTypes.FLAME;
         }
         else if (this.upgradeItem != null) {
-            type = EnumParticleTypes.ITEM_CRACK;
-            args = new int[] { Item.getIdFromItem(this.upgradeItem) };
+            type = new ItemParticleOption(ParticleTypes.ITEM, new ItemStack(this.upgradeItem));
         }
         else {
             return;
         }
         for (int i = 0; i < 30; i++) {
-            double dx = (world.rand.nextDouble() - 0.5) * 0.6;
-            double dy = world.rand.nextDouble() * 0.6;
-            double dz = (world.rand.nextDouble() - 0.5) * 0.6;
-            world.spawnParticle(type, x, y, z, 1, dx, dy, dz, 0.05, args);
+            double dx = (world.random.nextDouble() - 0.5) * 0.6;
+            double dy = world.random.nextDouble() * 0.6;
+            double dz = (world.random.nextDouble() - 0.5) * 0.6;
+            world.sendParticles(type, x, y, z, 1, dx, dy, dz, 0.05);
         }
     }
 }

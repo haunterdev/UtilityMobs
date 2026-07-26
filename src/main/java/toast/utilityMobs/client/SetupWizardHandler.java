@@ -3,11 +3,12 @@ package toast.utilityMobs.client;
 import java.io.File;
 import java.io.IOException;
 
-import net.minecraft.client.gui.GuiMainMenu;
-import net.minecraft.client.gui.GuiScreen;
-import net.minecraftforge.client.event.GuiOpenEvent;
-import net.minecraftforge.fml.common.Loader;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraftforge.client.event.ScreenEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.loading.FMLPaths;
+
 import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.setup.WizardState;
 
@@ -17,16 +18,16 @@ public class SetupWizardHandler {
     private static boolean shownThisSession;
 
     private static File markerFile() {
-        return new File(Loader.instance().getConfigDir(), _UtilityMobs.MODID + "/setup_done.flag");
+        return new File(FMLPaths.CONFIGDIR.get().toFile(), _UtilityMobs.MODID + "/setup_done.flag");
     }
 
     public static boolean markerExists() {
-        return markerFile().exists();
+        return SetupWizardHandler.markerFile().exists();
     }
 
     public static void writeMarker() {
         try {
-            File f = markerFile();
+            File f = SetupWizardHandler.markerFile();
             File dir = f.getParentFile();
             if (dir != null) {
                 dir.mkdirs();
@@ -35,19 +36,19 @@ public class SetupWizardHandler {
         } catch (IOException e) {
             _UtilityMobs.debugException("Could not write setup-wizard marker: " + e.getMessage());
         }
-        shownThisSession = true;
+        SetupWizardHandler.shownThisSession = true;
     }
 
     @SubscribeEvent
-    public void onGuiOpen(GuiOpenEvent event) {
-        GuiScreen gui = event.getGui();
-        if (gui == null || gui.getClass() != GuiMainMenu.class) {
+    public void onScreenOpening(ScreenEvent.Opening event) {
+        Screen gui = event.getScreen();
+        if (gui == null || gui.getClass() != TitleScreen.class) {
             return;
         }
-        if (shownThisSession || markerExists()) {
+        if (SetupWizardHandler.shownThisSession || SetupWizardHandler.markerExists()) {
             return;
         }
-        shownThisSession = true;
-        event.setGui(new GuiSetupWizard((GuiMainMenu) gui, WizardState.engineer()));
+        SetupWizardHandler.shownThisSession = true;
+        event.setNewScreen(new GuiSetupWizard((TitleScreen) gui, WizardState.engineer()));
     }
 }

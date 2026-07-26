@@ -1,42 +1,32 @@
 package toast.utilityMobs.network;
 
-import io.netty.buffer.ByteBuf;
-import net.minecraft.entity.player.EntityPlayerMP;
-import toast.utilityMobs.colossal.EntityColossalGolem;
-import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
-import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
-import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+import java.util.function.Supplier;
 
-public class MessageUseGolem implements IMessage {
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.network.NetworkEvent;
+import toast.utilityMobs.colossal.EntityColossalGolem;
+
+/// Client -> server: the rider of a colossal golem asked it to swing.
+public class MessageUseGolem {
 
     public MessageUseGolem() {
     }
 
-    @Override
-    public void fromBytes(ByteBuf buf) {
-        buf.readByte(); // Empty packets break things.
-    }
-
-    @Override
-    public void toBytes(ByteBuf buf) {
+    public static void encode(MessageUseGolem message, FriendlyByteBuf buf) {
         buf.writeByte(0); // Empty packets break things.
     }
 
-    public static class Handler implements IMessageHandler<MessageUseGolem, IMessage> {
+    public static MessageUseGolem decode(FriendlyByteBuf buf) {
+        buf.readByte(); // Empty packets break things.
+        return new MessageUseGolem();
+    }
 
-        @Override
-        public IMessage onMessage(MessageUseGolem message, MessageContext ctx) {
-            final EntityPlayerMP player = ctx.getServerHandler().player;
-            player.getServerWorld().addScheduledTask(new Runnable() {
-                @Override
-                public void run() {
-                    if (player.getRidingEntity() instanceof EntityColossalGolem) {
-                        ((EntityColossalGolem) player.getRidingEntity()).attackEntityAsMob(null);
-                    }
-                }
-            });
-            return null;
+    public static void handle(MessageUseGolem message, Supplier<NetworkEvent.Context> ctx) {
+        ServerPlayer player = ctx.get().getSender();
+        if (player != null && player.getVehicle() instanceof EntityColossalGolem golem) {
+            golem.doHurtTarget(null);
         }
-
+        ctx.get().setPacketHandled(true);
     }
 }

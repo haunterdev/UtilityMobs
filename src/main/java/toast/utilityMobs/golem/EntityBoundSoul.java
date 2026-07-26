@@ -1,22 +1,25 @@
 package toast.utilityMobs.golem;
 
-import net.minecraft.block.SoundType;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.EntityAILookIdle;
-import net.minecraft.entity.ai.EntityAIWander;
-import net.minecraft.entity.ai.EntityAIWatchClosest;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Blocks;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemFood;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.EnumHand;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.food.FoodProperties;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.SoundType;
 import toast.utilityMobs.TargetHelper;
 import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.ai.EntityAIFollowEntity;
 import toast.utilityMobs.ai.EntityAIGolemTarget;
+import toast.utilityMobs.ai.EntityAIGolemWander;
 import toast.utilityMobs.ai.EntityAIWeaponAttack;
 
 public class EntityBoundSoul extends EntityUtilityGolem
@@ -24,22 +27,26 @@ public class EntityBoundSoul extends EntityUtilityGolem
     /// The texture for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "golem/boundsoul.png");
 
-    public EntityBoundSoul(World world) {
-        super(world);
+    public EntityBoundSoul(EntityType<? extends EntityBoundSoul> type, Level level) {
+        super(type, level);
         this.texture = EntityBoundSoul.TEXTURE;
-        this.tasks.addTask(1, new EntityAIWeaponAttack(this, 1.0));
-        this.tasks.addTask(2, new EntityAIFollowEntity(this, EntityPlayer.class, 1.0, 10.0F, 16.0F));
-        this.tasks.addTask(3, new toast.utilityMobs.ai.EntityAIGolemWander(this, 1.0));
-        this.tasks.addTask(4, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));
-        this.tasks.addTask(4, new EntityAILookIdle(this));
-        this.targetTasks.addTask(1, new EntityAIGolemTarget(this));
+    }
+
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+        this.goalSelector.addGoal(1, new EntityAIWeaponAttack(this, 1.0));
+        this.goalSelector.addGoal(2, new EntityAIFollowEntity(this, Player.class, 1.0, 10.0F, 16.0F));
+        this.goalSelector.addGoal(3, new EntityAIGolemWander(this, 1.0));
+        this.goalSelector.addGoal(4, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
+        this.targetSelector.addGoal(1, new EntityAIGolemTarget(this));
     }
 
     /// Initializes this entity's attributes.
-    @Override
-    protected void applyEntityAttributes() {
-        super.applyEntityAttributes();
-        this.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).setBaseValue(0.3);
+    public static AttributeSupplier.Builder createAttributes() {
+        return EntityUtilityGolem.createAttributes()
+            .add(Attributes.MOVEMENT_SPEED, 0.3);
     }
 
     @Override
@@ -49,45 +56,46 @@ public class EntityBoundSoul extends EntityUtilityGolem
 
     @Override
     protected Item getDropItem() {
-        return Item.getItemFromBlock(Blocks.SOUL_SAND);
+        return Items.SOUL_SAND;
     }
 
     @Override
     protected void dropFewItems(boolean recentlyHit, int looting, float dropChance) {
-        for (int i = this.rand.nextInt(3); i-- > 0;) {
-            this.dropItem(this.getDropItem(), 1);
+        for (int i = this.random.nextInt(3); i-- > 0;) {
+            this.spawnAtLocation(this.getDropItem());
         }
     }
 
     @Override
-    public boolean processInteract(EntityPlayer player, EnumHand hand) {
+    public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!this.canInteract(player))
-            return super.processInteract(player, hand);
-        ItemStack playerHeld = player.getHeldItemMainhand();
+            return super.mobInteract(player, hand);
+        ItemStack playerHeld = player.getMainHandItem();
         if (playerHeld.isEmpty()) {
-            if (!this.world.isRemote) {
+            if (!this.level().isClientSide) {
                 if (!this.setEquipment(ItemStack.EMPTY))
-                    return super.processInteract(player, hand);
+                    return super.mobInteract(player, hand);
             }
-            return true;
+            return InteractionResult.sidedSuccess(this.level().isClientSide);
         }
-        if (player.isSneaking())
-            return super.processInteract(player, hand);
-        if (playerHeld.getItem() instanceof ItemFood) {
-            this.healAndShowNumber(((ItemFood)playerHeld.getItem()).getHealAmount(playerHeld));
+        if (player.isShiftKeyDown())
+            return super.mobInteract(player, hand);
+        FoodProperties food = playerHeld.getFoodProperties(this);
+        if (food != null) {
+            this.healAndShowNumber(food.getNutrition());
         }
-        else if (!this.world.isRemote) {
+        else if (!this.level().isClientSide) {
             ItemStack split = playerHeld.copy();
             split.setCount(1);
             this.setEquipment(split);
         }
-        if (!player.capabilities.isCreativeMode) {
+        if (!player.getAbilities().instabuild) {
             playerHeld.shrink(1);
         }
         if (playerHeld.isEmpty()) {
-            player.setHeldItem(EnumHand.MAIN_HAND, ItemStack.EMPTY);
+            player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
         }
-        return true;
+        return InteractionResult.sidedSuccess(this.level().isClientSide);
     }
 
     @Override

@@ -1,22 +1,24 @@
 package toast.utilityMobs.ai;
 
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.ai.EntityAIBase;
+import java.util.EnumSet;
+
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.goal.Goal;
 import toast.utilityMobs.turret.EntityTurretGolem;
 
-public class EntityAITurretAttack extends EntityAIBase
+public class EntityAITurretAttack extends Goal
 {
     public final EntityTurretGolem golem;
-    public EntityLivingBase target;
+    public LivingEntity target;
 
     public EntityAITurretAttack(EntityTurretGolem entity) {
         this.golem = entity;
-        this.setMutexBits(3);
+        this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
     }
 
     @Override
-    public boolean shouldExecute() {
-        EntityLivingBase entity = this.golem.getAttackTarget();
+    public boolean canUse() {
+        LivingEntity entity = this.golem.getTarget();
         if (entity == null)
             return false;
         this.target = entity;
@@ -24,51 +26,51 @@ public class EntityAITurretAttack extends EntityAIBase
     }
 
     @Override
-    public boolean shouldContinueExecuting() {
-        if (this.golem.targetAI.shouldExecute()) {
-            this.golem.targetAI.startExecuting();
-            this.target = this.golem.getAttackTarget();
+    public boolean canContinueToUse() {
+        if (this.golem.targetAI.canUse()) {
+            this.golem.targetAI.start();
+            this.target = this.golem.getTarget();
             return true;
         }
         return false;
     }
 
     @Override
-    public void startExecuting() {
+    public void start() {
         // Do nothing
     }
 
     @Override
-    public void resetTask() {
+    public void stop() {
         this.target = null;
-        this.golem.setAttackTarget(null);
+        this.golem.setTarget(null);
     }
 
     @Override
-    public void updateTask() {
-        // Aim the whole turret at the target directly. The look helper only turns the head and is
+    public void tick() {
+        // Aim the whole turret at the target directly. The look control only turns the head and is
         // clamped to ±limit of the (never-rotating) body, so a stationary turret's barrel ended up
         // stuck pointing backwards and only "snapped" toward the target on the firing tick. Setting
         // body + head + pitch (and their prev values, so there is no interp smear) every tick makes
-        // the base and barrel track the target smoothly. ModelTurret maps foot=renderYawOffset,
-        // head=netHeadYaw(=0 here), headPitch=rotationPitch.
-        double dx = this.target.posX - this.golem.posX;
-        double dz = this.target.posZ - this.golem.posZ;
+        // the base and barrel track the target smoothly. ModelTurret maps foot=yBodyRot,
+        // head=netHeadYaw(=0 here), headPitch=xRot.
+        double dx = this.target.getX() - this.golem.getX();
+        double dz = this.target.getZ() - this.golem.getZ();
         double horiz = Math.sqrt(dx * dx + dz * dz);
-        double dy = (this.target.posY + this.target.getEyeHeight())
-                - (this.golem.posY + this.golem.getEyeHeight());
+        double dy = (this.target.getY() + this.target.getEyeHeight())
+                - (this.golem.getY() + this.golem.getEyeHeight());
         float yaw = (float) (Math.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0F;
         float pitch = (float) (-(Math.atan2(dy, horiz) * (180.0 / Math.PI)));
-        this.golem.rotationYaw = yaw;
-        this.golem.prevRotationYaw = yaw;
-        this.golem.renderYawOffset = yaw;
-        this.golem.prevRenderYawOffset = yaw;
-        this.golem.rotationYawHead = yaw;
-        this.golem.prevRotationYawHead = yaw;
-        this.golem.rotationPitch = pitch;
-        this.golem.prevRotationPitch = pitch;
-        if (this.golem.getRNG().nextInt(40) == 0) {
-            if (this.golem.getRNG().nextInt(2) == 0) {
+        this.golem.setYRot(yaw);
+        this.golem.yRotO = yaw;
+        this.golem.yBodyRot = yaw;
+        this.golem.yBodyRotO = yaw;
+        this.golem.yHeadRot = yaw;
+        this.golem.yHeadRotO = yaw;
+        this.golem.setXRot(pitch);
+        this.golem.xRotO = pitch;
+        if (this.golem.getRandom().nextInt(40) == 0) {
+            if (this.golem.getRandom().nextInt(2) == 0) {
                 this.golem.golemAttackTime--;
             }
             else {
@@ -83,5 +85,11 @@ public class EntityAITurretAttack extends EntityAIBase
         if (this.golem.requiresAmmo())
             this.golem.consumeAmmo(this.golem.getAmmoPerShot());
         this.golem.golemAttackTime = this.golem.maxAttackTime;
+    }
+
+    /// The turret aim + fire logic must run every tick, not on the throttled goal cadence.
+    @Override
+    public boolean requiresUpdateEveryTick() {
+        return true;
     }
 }

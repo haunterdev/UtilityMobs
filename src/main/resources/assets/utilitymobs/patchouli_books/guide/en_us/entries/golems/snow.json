@@ -1,7 +1,7 @@
 {
   "name": "Snow Golem",
   "category": "utilitymobs:golems",
-  "icon": "minecraft:snow",
+  "icon": "minecraft:snow_block",
   "sortnum": 0,
   "pages": [
     {
@@ -20,9 +20,9 @@
           ]
         ],
         "mapping": {
-          "P": "minecraft:pumpkin[facing=north]",
-          "S": "minecraft:snow",
-          "0": "minecraft:snow"
+          "P": "minecraft:carved_pumpkin[facing=north]",
+          "S": "minecraft:snow_block",
+          "0": "minecraft:snow_block"
         }
       },
       "text": "",

@@ -20,7 +20,7 @@
           ]
         ],
         "mapping": {
-          "P": "minecraft:pumpkin[facing=north]",
+          "P": "minecraft:carved_pumpkin[facing=north]",
           "G": "minecraft:gold_block",
           "0": "minecraft:gold_block"
         }
@@ -31,7 +31,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:gildedgolem",
+      "entity": "utilitymobs:gilded_golem",
       "name": "Gilded Armor Golem",
       "offset": 0.12,
       "text": "Health: 20  Armor: 11$(br)Damage: 5  Speed: 2.8"

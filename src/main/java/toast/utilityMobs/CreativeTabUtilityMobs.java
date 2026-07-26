@@ -1,57 +1,81 @@
 package toast.utilityMobs;
 
-import net.minecraft.creativetab.CreativeTabs;
-import net.minecraft.init.Items;
-import net.minecraft.item.ItemMonsterPlacer;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.NonNullList;
-import net.minecraft.util.ResourceLocation;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.RegistryObject;
+import toast.utilityMobs.setup.ModEntities;
+import toast.utilityMobs.setup.ModRegistries;
 
 /**
-    The mod's creative tab. The mod registers no items of its own - its content is the utility
-    mob spawn eggs (one per registered entity) plus the NBT manual/upgrade/target books, all
-    injected here via displayAllRelevantItems.
+    The mod's creative tab. The mod registers no items of its own beyond spawn eggs - its content is
+    the utility mob spawn eggs (one per registered entity) plus the NBT manual/upgrade/target books.
+
+    <p>1.12.2 injected the eggs at display time via {@code displayAllRelevantItems}, building each
+    from {@code Items.SPAWN_EGG} + an entity id NBT tag. 1.20.1 has no generic egg item, so each mob
+    owns a real {@link net.minecraftforge.common.ForgeSpawnEggItem} (see {@link ModEntities}) and the
+    tab simply lists them. Egg colors are unchanged.
  */
-public class CreativeTabUtilityMobs extends CreativeTabs
-{
-    public static final CreativeTabUtilityMobs INSTANCE = new CreativeTabUtilityMobs();
+public final class CreativeTabUtilityMobs {
+    private CreativeTabUtilityMobs() {}
 
-    private CreativeTabUtilityMobs() {
-        super(_UtilityMobs.MODID);
-    }
+    /// Eggs listed in the tab, in registration order. Leaf waves append here.
+    private static final RegistryObject<?>[] EGGS = {
+        ModEntities.ANVIL_GOLEM_EGG,
+        ModEntities.CHEST_ENDER_GOLEM_EGG,
+        ModEntities.CHEST_GOLEM_EGG,
+        ModEntities.CHEST_TRAPPED_GOLEM_EGG,
+        ModEntities.FURNACE_GOLEM_EGG,
+        ModEntities.JUKEBOX_GOLEM_EGG,
+        ModEntities.LANTERN_GOLEM_EGG,
+        ModEntities.WORKBENCH_GOLEM_EGG,
+        ModEntities.ARMOR_GOLEM_EGG,
+        ModEntities.BOUND_SOUL_EGG,
+        ModEntities.GILDED_GOLEM_EGG,
+        ModEntities.MELON_GOLEM_EGG,
+        ModEntities.OBSIDIAN_GOLEM_EGG,
+        ModEntities.SCARECROW_EGG,
+        ModEntities.STEAM_GOLEM_EGG,
+        ModEntities.STONE_GOLEM_EGG,
+        ModEntities.STONE_LARGE_GOLEM_EGG,
+        ModEntities.BRICK_TURRET_EGG,
+        ModEntities.FIREBALL_TURRET_EGG,
+        ModEntities.FIRE_TURRET_EGG,
+        ModEntities.GATLING_TURRET_EGG,
+        ModEntities.GHAST_TURRET_EGG,
+        ModEntities.KILLER_TURRET_EGG,
+        ModEntities.OBSIDIAN_TURRET_EGG,
+        ModEntities.SHOTGUN_TURRET_EGG,
+        ModEntities.SNIPER_TURRET_EGG,
+        ModEntities.SNOW_TURRET_EGG,
+        ModEntities.VOLLEY_TURRET_EGG,
+        ModEntities.STONE_TURRET_EGG,
+        ModEntities.ARMOR_COLOSSUS_EGG,
+        ModEntities.OBSIDIAN_COLOSSUS_EGG,
+        ModEntities.STONE_COLOSSUS_EGG,
+    };
 
-    @Override
-    @SideOnly(Side.CLIENT)
-    public ItemStack createIcon() {
-        // Hidden throwaway item textured with the stone golem's face (see _UtilityMobs.TAB_ICON).
-        return new ItemStack(_UtilityMobs.TAB_ICON);
-    }
-
-    @Override
-    @SideOnly(Side.CLIENT)
-    public void displayAllRelevantItems(NonNullList<ItemStack> list) {
-        // A spawn egg for every registered utility mob.
-        for (int i = 0; i < _UtilityMobs.UTILITY_NAMES.length; i++) {
-            for (int j = 0; j < _UtilityMobs.UTILITY_NAMES[i].length; j++) {
-                ItemStack egg = new ItemStack(Items.SPAWN_EGG);
-                ItemMonsterPlacer.applyEntityIdToItemStack(egg, new ResourceLocation(_UtilityMobs.MODID, _UtilityMobs.UTILITY_NAMES[i][j].toLowerCase()));
-                list.add(egg);
-            }
-        }
-        // The UM iron/snow golems live outside UTILITY_NAMES (vanilla-mob variants) but still get eggs.
-        for (String variant : new String[] { "umirongolem", "umsnowgolem" }) {
-            ItemStack egg = new ItemStack(Items.SPAWN_EGG);
-            ItemMonsterPlacer.applyEntityIdToItemStack(egg, new ResourceLocation(_UtilityMobs.MODID, variant));
-            list.add(egg);
-        }
-        // The Patchouli guide book and the two target books.
-        ItemStack guide = GuideBook.stack();
-        if (guide != null && !guide.isEmpty()) {
-            list.add(guide);
-        }
-        list.add(TargetHelper.book(0));
-        list.add(TargetHelper.book(1));
-    }
+    public static final RegistryObject<CreativeModeTab> TAB = ModRegistries.TABS.register("utilitymobs", () ->
+        CreativeModeTab.builder()
+            .title(Component.translatable("itemGroup." + _UtilityMobs.MODID))
+            // 1.12.2 used a hidden throwaway item textured with the stone golem's face. The stone
+            // golem egg carries the same identity without needing a dead registry entry.
+            .icon(() -> new ItemStack(ModEntities.STONE_GOLEM_EGG.get()))
+            .displayItems((params, output) -> {
+                for (RegistryObject<?> egg : EGGS) {
+                    output.accept(new ItemStack((net.minecraft.world.item.Item)egg.get()));
+                }
+                // The Patchouli guide book. Empty when Patchouli is not installed (the API stub hands
+                // back an empty stack), in which case the tab simply has no book entry.
+                ItemStack guide = GuideBook.stack();
+                if (!guide.isEmpty()) {
+                    output.accept(guide);
+                }
+                // The two target helper books: player permissions and mob target list.
+                output.accept(TargetHelper.book(0));
+                output.accept(TargetHelper.book(1));
+                // Testing tool, not part of the 1.12.2 mod.
+                output.accept(new ItemStack(toast.utilityMobs.setup.ModItems.ADMIN_SWORD.get()));
+            })
+            .build());
 }

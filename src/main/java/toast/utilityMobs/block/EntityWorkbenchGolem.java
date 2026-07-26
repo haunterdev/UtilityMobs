@@ -1,33 +1,40 @@
 package toast.utilityMobs.block;
 
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.init.Blocks;
-import net.minecraft.item.Item;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import toast.utilityMobs._UtilityMobs;
-import toast.utilityMobs.network.GuiHelper;
 
 public class EntityWorkbenchGolem extends EntityContainerGolem
 {
+    /// Differs from 1.12.2, which left every golem outside the six that already override this
+    /// on the default iron-golem hurt/death sounds. Flavoured by build material: crafting table.
+    @Override
+    protected net.minecraft.world.level.block.SoundType getGolemSoundType() {
+        return net.minecraft.world.level.block.SoundType.WOOD;
+    }
+
     /// The texture for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "block/workbenchgolem.png");
 
-    public EntityWorkbenchGolem(World world) {
-        super(world);
+    public EntityWorkbenchGolem(EntityType<? extends EntityWorkbenchGolem> type, Level level) {
+        super(type, level);
         this.texture = EntityWorkbenchGolem.TEXTURE;
     }
 
     @Override
     protected Item getDropItem() {
-        return Item.getItemFromBlock(Blocks.CRAFTING_TABLE);
+        return Items.CRAFTING_TABLE;
     }
 
     /// Opens this block golem's GUI.
     @Override
-    public boolean openGUI(EntityPlayer player) {
-        if (!this.world.isRemote) {
-            GuiHelper.displayGUIWorkbench(player, this);
+    public boolean openGUI(Player player) {
+        if (!this.level().isClientSide) {
+            toast.utilityMobs.network.GuiHelper.displayGUIWorkbench(player, this);
         }
         return true;
     }

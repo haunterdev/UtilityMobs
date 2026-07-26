@@ -1,12 +1,15 @@
 package toast.utilityMobs.ai;
 
-import net.minecraft.entity.ai.EntityAIBase;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
+import java.util.EnumSet;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.player.Player;
 import toast.utilityMobs.golem.EntityUtilityGolem;
 
-public class EntityAIGolemFollow extends EntityAIBase
+public class EntityAIGolemFollow extends Goal
 {
     /// Distance (squared) beyond which a golem teleports to its owner instead of pathing. 12 blocks.
     private static final double TELEPORT_DIST_SQ = 144.0;
@@ -20,7 +23,7 @@ public class EntityAIGolemFollow extends EntityAIBase
     public double moveSpeed;
     public float minDistance, maxDistance;
 
-    public EntityPlayer owner;
+    public Player owner;
     public int pathDelay = 0;
 
     /// Refills the per-tick teleport budget. Called once per server tick.
@@ -33,76 +36,76 @@ public class EntityAIGolemFollow extends EntityAIBase
         this.moveSpeed = speed;
         this.minDistance = min;
         this.maxDistance = max;
-        this.setMutexBits(3);
+        this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
     }
 
-    /// Returns whether the EntityAIBase should begin execution.
+    /// Returns whether the Goal should begin execution.
     @Override
-    public boolean shouldExecute() {
-        EntityPlayer player = this.golem.getOwner();
-        if (player == null || this.golem.isSitting() || this.golem.getDistanceSq(player) < this.minDistance * this.minDistance)
+    public boolean canUse() {
+        Player player = this.golem.getOwner();
+        if (player == null || this.golem.isSitting() || this.golem.distanceToSqr(player) < this.minDistance * this.minDistance)
             return false;
         this.owner = player;
         return true;
     }
 
-    /// Returns whether an in-progress EntityAIBase should continue executing.
+    /// Returns whether an in-progress Goal should continue executing.
     @Override
-    public boolean shouldContinueExecuting() {
-        return !this.golem.getNavigator().noPath() && this.golem.getDistanceSq(this.owner) > this.maxDistance * this.maxDistance && !this.golem.isSitting();
+    public boolean canContinueToUse() {
+        return !this.golem.getNavigation().isDone() && this.golem.distanceToSqr(this.owner) > this.maxDistance * this.maxDistance && !this.golem.isSitting();
     }
 
     /// Execute a one shot task or start executing a continuous task.
     @Override
-    public void startExecuting() {
+    public void start() {
         this.pathDelay = 0;
     }
 
     /// Resets the task.
     @Override
-    public void resetTask() {
+    public void stop() {
         this.owner = null;
-        this.golem.getNavigator().clearPath();
+        this.golem.getNavigation().stop();
     }
 
     /// Updates the task
     @Override
-    public void updateTask() {
-        this.golem.getLookHelper().setLookPositionWithEntity(this.owner, 10.0F, this.golem.getVerticalFaceSpeed());
+    public void tick() {
+        this.golem.getLookControl().setLookAt(this.owner, 10.0F, this.golem.getMaxHeadXRot());
         if (this.golem.isSitting() || --this.pathDelay > 0) {
             return;
         }
         this.pathDelay = 10;
         // When too far to realistically path, teleport instead of running a doomed A* search first.
-        // The old code A*'d every follow tick for far golems (the path almost always fails at range) and
-        // only then teleported - with a big army that ran the player away, that was thousands of failed
-        // pathfinds in one tick (the anvil-golem teleport lag spike). Now far golems skip straight to a
-        // budgeted teleport, so the army trickles to the player instead of all pathing at once.
-        if (this.golem.getDistanceSq(this.owner) >= EntityAIGolemFollow.TELEPORT_DIST_SQ) {
+        // Far golems skip straight to a budgeted teleport, so the army trickles to the player instead
+        // of all pathing at once (the anvil-golem teleport lag spike).
+        if (this.golem.distanceToSqr(this.owner) >= EntityAIGolemFollow.TELEPORT_DIST_SQ) {
             if (EntityAIGolemFollow.teleportBudgetRemaining > 0 && this.tryTeleportToOwner()) {
                 EntityAIGolemFollow.teleportBudgetRemaining--;
             }
             return;
         }
         // Close enough to walk: path normally.
-        this.golem.getNavigator().tryMoveToEntityLiving(this.owner, this.moveSpeed);
+        this.golem.getNavigation().moveTo(this.owner, this.moveSpeed);
     }
 
     /// Searches the ring of blocks around the owner for a safe standing spot and teleports there.
     /// Returns true if a spot was found and the golem moved. Mirrors the original block-scan placement.
     private boolean tryTeleportToOwner() {
-        int i = MathHelper.floor(this.owner.posX) - 2;
-        int j = MathHelper.floor(this.owner.posZ) - 2;
-        int k = MathHelper.floor(this.owner.getEntityBoundingBox().minY);
+        int i = Mth.floor(this.owner.getX()) - 2;
+        int j = Mth.floor(this.owner.getZ()) - 2;
+        int k = Mth.floor(this.owner.getBoundingBox().minY);
         for (int l = 0; l <= 4; ++l) {
             for (int i1 = 0; i1 <= 4; ++i1) {
                 if (l < 1 || i1 < 1 || l > 3 || i1 > 3) {
                     BlockPos posGround = new BlockPos(i + l, k - 1, j + i1);
                     BlockPos posBody = new BlockPos(i + l, k, j + i1);
                     BlockPos posHead = new BlockPos(i + l, k + 1, j + i1);
-                    if (this.golem.world.getBlockState(posGround).isTopSolid() && !this.golem.world.getBlockState(posBody).isNormalCube() && !this.golem.world.getBlockState(posHead).isNormalCube()) {
-                        this.golem.setLocationAndAngles(i + l + 0.5F, k, j + i1 + 0.5F, this.golem.rotationYaw, this.golem.rotationPitch);
-                        this.golem.getNavigator().clearPath();
+                    if (this.golem.level().getBlockState(posGround).isFaceSturdy(this.golem.level(), posGround, Direction.UP)
+                            && !this.golem.level().getBlockState(posBody).blocksMotion()
+                            && !this.golem.level().getBlockState(posHead).blocksMotion()) {
+                        this.golem.moveTo(i + l + 0.5, k, j + i1 + 0.5, this.golem.getYRot(), this.golem.getXRot());
+                        this.golem.getNavigation().stop();
                         return true;
                     }
                 }

@@ -1,43 +1,60 @@
 package toast.utilityMobs.golem;
 
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.entity.ai.EntityAILookIdle;
-import net.minecraft.entity.ai.EntityAIWander;
-import net.minecraft.entity.ai.EntityAIWatchClosest;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.ai.EntityAIGolemTarget;
+import toast.utilityMobs.ai.EntityAIGolemWander;
 import toast.utilityMobs.ai.EntityAIWeaponAttack;
 
 public class EntityObsidianGolem extends EntityLargeGolem
 {
+    /// Differs from 1.12.2, which left every golem outside the six that already override this
+    /// on the default iron-golem hurt/death sounds. Flavoured by build material: obsidian.
+    @Override
+    protected net.minecraft.world.level.block.SoundType getGolemSoundType() {
+        return net.minecraft.world.level.block.SoundType.STONE;
+    }
+
     /// The texture for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "golem/obsidiangolem.png");
 
-    public EntityObsidianGolem(World world) {
-        super(world);
+    public EntityObsidianGolem(EntityType<? extends EntityObsidianGolem> type, Level level) {
+        super(type, level);
         this.texture = EntityObsidianGolem.TEXTURE;
-        this.isImmuneToFire = true;
-        this.tasks.addTask(1, new EntityAIWeaponAttack(this, 1.0));
-        this.tasks.addTask(2, new toast.utilityMobs.ai.EntityAIGolemWander(this, 1.0));
-        this.tasks.addTask(3, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));
-        this.tasks.addTask(3, new EntityAILookIdle(this));
-        this.targetTasks.addTask(1, new EntityAIGolemTarget(this));
+    }
+
+    @Override
+    public boolean fireImmune() {
+        return true;
+    }
+
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+        this.goalSelector.addGoal(1, new EntityAIWeaponAttack(this, 1.0));
+        this.goalSelector.addGoal(2, new EntityAIGolemWander(this, 1.0));
+        this.goalSelector.addGoal(3, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
+        this.targetSelector.addGoal(1, new EntityAIGolemTarget(this));
     }
 
     /// Initializes this entity's attributes.
-    @Override
-    protected void applyEntityAttributes() {
-        super.applyEntityAttributes();
-        this.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).setBaseValue(100.0);
-        this.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).setBaseValue(0.25);
-        this.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE).setBaseValue(2.0);
+    public static AttributeSupplier.Builder createAttributes() {
+        return EntityLargeGolem.createAttributes()
+            .add(Attributes.MAX_HEALTH, 100.0)
+            .add(Attributes.MOVEMENT_SPEED, 0.25)
+            .add(Attributes.ATTACK_DAMAGE, 2.0);
     }
 
     @Override
-    public int getTotalArmorValue() {
+    public int getArmorValue() {
         return 20;
     }
 

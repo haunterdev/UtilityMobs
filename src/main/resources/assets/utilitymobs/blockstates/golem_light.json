@@ -1,5 +1,5 @@
 {
   "variants": {
-    "normal": { "model": "utilitymobs:golem_light" }
+    "": { "model": "utilitymobs:block/golem_light" }
   }
 }

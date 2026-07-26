@@ -17,7 +17,7 @@
           ]
         ],
         "mapping": {
-          "S": "minecraft:skull",
+          "S": "minecraft:skeleton_skull",
           "0": "minecraft:chest"
         }
       },
@@ -27,7 +27,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:chestgolem",
+      "entity": "utilitymobs:chest_golem",
       "name": "Chest Golem",
       "text": "Health: 10  Armor: 0$(br)Speed: 2.8",
       "scale": 0.5

@@ -1,11 +1,13 @@
 package toast.utilityMobs.golem;
 
-import net.minecraft.block.SoundType;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.init.Blocks;
-import net.minecraft.item.Item;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.SoundType;
 import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.ai.EntityAIGolemTarget;
 import toast.utilityMobs.ai.EntityAIWeaponAttack;
@@ -20,38 +22,41 @@ public class EntityStoneGolem extends EntityUtilityGolem
         return SoundType.STONE;
     }
 
-
-    public EntityStoneGolem(World world) {
-        super(world);
+    public EntityStoneGolem(EntityType<? extends EntityStoneGolem> type, Level level) {
+        super(type, level);
         this.texture = EntityStoneGolem.TEXTURE;
-        this.tasks.addTask(1, new EntityAIWeaponAttack(this, 1.0));
-        this.targetTasks.addTask(1, new EntityAIGolemTarget(this));
+    }
+
+    @Override
+    protected void registerGoals() {
+        super.registerGoals();
+        this.goalSelector.addGoal(1, new EntityAIWeaponAttack(this, 1.0));
+        this.targetSelector.addGoal(1, new EntityAIGolemTarget(this));
     }
 
     /// Initializes this entity's attributes.
-    @Override
-    protected void applyEntityAttributes() {
-        super.applyEntityAttributes();
-        this.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).setBaseValue(10.0);
-        this.getEntityAttribute(SharedMonsterAttributes.MOVEMENT_SPEED).setBaseValue(0.24);
-        this.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE).setBaseValue(2.0);
+    public static AttributeSupplier.Builder createAttributes() {
+        return EntityUtilityGolem.createAttributes()
+            .add(Attributes.MAX_HEALTH, 10.0)
+            .add(Attributes.MOVEMENT_SPEED, 0.24)
+            .add(Attributes.ATTACK_DAMAGE, 2.0);
     }
 
     /// Returns the armor of this entity.
     @Override
-    public int getTotalArmorValue() {
-        return Math.min(20, super.getTotalArmorValue() + 2);
+    public int getArmorValue() {
+        return Math.min(20, super.getArmorValue() + 2);
     }
 
     @Override
     protected Item getDropItem() {
-        return Item.getItemFromBlock(Blocks.COBBLESTONE);
+        return Items.COBBLESTONE;
     }
 
     @Override
     protected void dropFewItems(boolean recentlyHit, int looting, float dropChance) {
-        if (this.rand.nextInt(2) == 0) {
-            this.dropItem(this.getDropItem(), 1);
+        if (this.random.nextInt(2) == 0) {
+            this.spawnAtLocation(this.getDropItem());
         }
     }
 }

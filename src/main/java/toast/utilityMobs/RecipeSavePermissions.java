@@ -1,25 +1,41 @@
 package toast.utilityMobs;
 
-import net.minecraft.init.Items;
-import net.minecraft.inventory.InventoryCrafting;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.crafting.IRecipe;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.world.World;
-import net.minecraftforge.registries.IForgeRegistryEntry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.inventory.CraftingContainer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.CraftingBookCategory;
+import net.minecraft.world.item.crafting.CustomRecipe;
+import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.world.level.Level;
+import toast.utilityMobs.setup.ModRecipes;
 
-public class RecipeSavePermissions extends IForgeRegistryEntry.Impl<IRecipe> implements IRecipe
+/**
+ * Puts a target book back on the crafting grid on its own to get an editable copy: the result is a
+ * book and quill carrying the same target data, tagged "umu" so TickHandler knows to parse it once the
+ * player takes it.
+ *
+ * <p>1.12.2 implemented IRecipe directly. 1.20.1's CustomRecipe is the same idea with the boilerplate
+ * removed, and it needs a serializer registered so the data-driven recipe file can point at it.
+ */
+public class RecipeSavePermissions extends CustomRecipe
 {
+    public RecipeSavePermissions(net.minecraft.resources.ResourceLocation id, CraftingBookCategory category) {
+        super(id, category);
+    }
+
     // Used to check if a recipe matches current crafting inventory.
     @Override
-    public boolean matches(InventoryCrafting craftMatrix, World world) {
+    public boolean matches(CraftingContainer craftMatrix, Level level) {
         ItemStack targetBook = ItemStack.EMPTY;
-        for (int i = 0; i < craftMatrix.getSizeInventory(); i++) {
-            ItemStack ingredient = craftMatrix.getStackInSlot(i);
+        for (int i = 0; i < craftMatrix.getContainerSize(); i++) {
+            ItemStack ingredient = craftMatrix.getItem(i);
             if (ingredient.isEmpty()) {
                 // Do nothing
             }
-            else if (targetBook.isEmpty() && (ingredient.getItem() == Items.WRITABLE_BOOK || ingredient.getItem() == Items.WRITTEN_BOOK) && ingredient.getTagCompound() != null && ingredient.getTagCompound().hasKey("umt")) {
+            else if (targetBook.isEmpty() && (ingredient.is(Items.WRITABLE_BOOK) || ingredient.is(Items.WRITTEN_BOOK))
+                    && ingredient.getTag() != null && ingredient.getTag().contains("umt")) {
                 targetBook = ingredient;
             }
             else
@@ -30,13 +46,13 @@ public class RecipeSavePermissions extends IForgeRegistryEntry.Impl<IRecipe> imp
 
     // Returns an item stack that is the result of this recipe.
     @Override
-    public ItemStack getCraftingResult(InventoryCrafting craftMatrix) {
-        for (int i = 0; i < craftMatrix.getSizeInventory(); i++) {
-            ItemStack ingredient = craftMatrix.getStackInSlot(i);
-            if (!ingredient.isEmpty()) {
+    public ItemStack assemble(CraftingContainer craftMatrix, RegistryAccess registries) {
+        for (int i = 0; i < craftMatrix.getContainerSize(); i++) {
+            ItemStack ingredient = craftMatrix.getItem(i);
+            if (!ingredient.isEmpty() && ingredient.getTag() != null) {
                 ItemStack book = new ItemStack(Items.WRITABLE_BOOK);
-                book.setTagCompound((NBTTagCompound)ingredient.getTagCompound().copy());
-                book.getTagCompound().setByte("umu", (byte)0);
+                book.setTag((CompoundTag)ingredient.getTag().copy());
+                book.getOrCreateTag().putByte("umu", (byte)0);
                 return book;
             }
         }
@@ -45,13 +61,12 @@ public class RecipeSavePermissions extends IForgeRegistryEntry.Impl<IRecipe> imp
 
     // Whether this recipe fits in the given crafting grid (single ingredient, fits any grid).
     @Override
-    public boolean canFit(int width, int height) {
+    public boolean canCraftInDimensions(int width, int height) {
         return width * height >= 1;
     }
 
-    // Returns the output for the recipe.
     @Override
-    public ItemStack getRecipeOutput() {
-        return ItemStack.EMPTY;
+    public RecipeSerializer<?> getSerializer() {
+        return ModRecipes.SAVE_PERMISSIONS.get();
     }
 }

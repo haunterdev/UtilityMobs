@@ -20,7 +20,7 @@
           ]
         ],
         "mapping": {
-          "P": "minecraft:pumpkin[facing=north]",
+          "P": "minecraft:carved_pumpkin[facing=north]",
           "C": "minecraft:cobblestone",
           "F": "minecraft:furnace[facing=north]",
           "0": "minecraft:cobblestone"
@@ -30,7 +30,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:steamgolem",
+      "entity": "utilitymobs:steam_golem",
       "name": "Steam Golem",
       "text": "Health: 40  Armor: 2$(br)Damage: 7  Speed: 2.5"
     },

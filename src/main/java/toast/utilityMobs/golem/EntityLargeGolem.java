@@ -1,13 +1,16 @@
 package toast.utilityMobs.golem;
 
-import net.minecraft.block.Block;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.SharedMonsterAttributes;
-import net.minecraft.init.SoundEvents;
-import net.minecraft.util.DamageSource;
-import net.minecraft.util.SoundEvent;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import toast.utilityMobs.UMSound;
 
 public class EntityLargeGolem extends EntityUtilityGolem
@@ -15,21 +18,20 @@ public class EntityLargeGolem extends EntityUtilityGolem
     private int hitTime;
     private int animationTime;
 
-    public EntityLargeGolem(World world) {
-        super(world);
-        this.setSize(1.4F, 2.9F);
+    /// Registered entity size: 1.4 x 2.9 (set via EntityType.Builder.sized at registration).
+    public EntityLargeGolem(EntityType<? extends EntityLargeGolem> type, Level level) {
+        super(type, level);
     }
 
     /// Initializes this entity's attributes.
-    @Override
-    protected void applyEntityAttributes() {
-        super.applyEntityAttributes();
-        this.getEntityAttribute(SharedMonsterAttributes.MAX_HEALTH).setBaseValue(40.0);
+    public static AttributeSupplier.Builder createAttributes() {
+        return EntityUtilityGolem.createAttributes()
+            .add(Attributes.MAX_HEALTH, 40.0);
     }
 
     @Override
-    public void onLivingUpdate() {
-        super.onLivingUpdate();
+    public void aiStep() {
+        super.aiStep();
         if (this.hitTime > 0) {
             this.hitTime--;
         }
@@ -37,50 +39,51 @@ public class EntityLargeGolem extends EntityUtilityGolem
             this.animationTime--;
         }
         // Drive sprint (and its dirt-kick particles) off actual leg motion, not raw velocity:
-        // limbSwingAmount decays to ~0 within a couple ticks of stopping, so particles stop promptly
-        // instead of lingering on residual slide (the 2.5E-7 velocity threshold never cleared).
-        this.setSprinting(this.limbSwingAmount > 0.1F);
+        // walkAnimation speed decays to ~0 within a couple ticks of stopping, so particles stop
+        // promptly instead of lingering on residual slide (the 2.5E-7 velocity threshold never cleared).
+        this.setSprinting(this.walkAnimation.speed() > 0.1F);
     }
 
     @Override
-    public boolean attackEntityAsMob(Entity entity) {
+    public boolean doHurtTarget(Entity entity) {
         this.hitTime = 10;
-        this.world.setEntityState(this, (byte)4);
+        this.level().broadcastEntityEvent(this, (byte)4);
         UMSound.playAt(this, UMSound.IRONGOLEM_THROW, 1.0F, 1.0F);
-        return super.attackEntityAsMob(entity);
+        return super.doHurtTarget(entity);
     }
 
     @Override
     public void hitEffects(Entity entity) {
-        entity.motionY += 0.4;
+        Vec3 motion = entity.getDeltaMovement();
+        entity.setDeltaMovement(motion.x, motion.y + 0.4, motion.z);
     }
 
     @Override
-    public void handleStatusUpdate(byte b) {
-        if (b == 4) {
+    public void handleEntityEvent(byte id) {
+        if (id == 4) {
             this.hitTime = 10;
             UMSound.playAt(this, UMSound.IRONGOLEM_THROW, 1.0F, 1.0F);
         }
-        else if (b == 11) {
+        else if (id == 11) {
             this.animationTime = 400;
         }
         else {
-            super.handleStatusUpdate(b);
+            super.handleEntityEvent(id);
         }
     }
 
     @Override
     protected SoundEvent getHurtSound(DamageSource damageSource) {
-        return SoundEvents.ENTITY_IRONGOLEM_HURT;
+        return SoundEvents.IRON_GOLEM_HURT;
     }
 
     @Override
     protected SoundEvent getDeathSound() {
-        return SoundEvents.ENTITY_IRONGOLEM_DEATH;
+        return SoundEvents.IRON_GOLEM_DEATH;
     }
 
     @Override
-    protected void playStepSound(BlockPos pos, Block block) {
+    protected void playStepSound(BlockPos pos, BlockState state) {
         UMSound.playAt(this, UMSound.IRONGOLEM_WALK, 1.0F, 1.0F);
     }
 

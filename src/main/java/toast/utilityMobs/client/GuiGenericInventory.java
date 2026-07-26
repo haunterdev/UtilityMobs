@@ -1,60 +1,62 @@
 package toast.utilityMobs.client;
 
-import java.io.IOException;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 
-import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.gui.inventory.GuiContainer;
-import net.minecraft.client.renderer.GlStateManager;
-import net.minecraft.client.resources.I18n;
-import net.minecraft.inventory.Container;
-import net.minecraft.inventory.IInventory;
-import net.minecraft.util.ResourceLocation;
-import toast.utilityMobs.GuideBook;
-
-public class GuiGenericInventory extends GuiContainer {
+/**
+ * A plain container screen over any vanilla inventory background. Used for golems whose menu is just
+ * slots, so it needs no widgets of its own.
+ *
+ * <p>1.12.2's GuiBorderedButton is deliberately not ported: it existed only because a vanilla button
+ * shorter than 20px sampled the top of the widget graphic and clipped its own bottom border. 1.20.1
+ * draws buttons nine-sliced, so a short button already closes its frame and the workaround would only
+ * reimplement vanilla rendering worse.
+ */
+public class GuiGenericInventory<T extends AbstractContainerMenu> extends AbstractContainerScreen<T> {
 
     public static final ResourceLocation TEXTURE_DISPENSER = new ResourceLocation("textures/gui/container/dispenser.png");
 
-    private ResourceLocation texture;
-    private IInventory inventory;
+    private final ResourceLocation texture;
 
-    public GuiGenericInventory(Container container, IInventory inventory, ResourceLocation texture) {
-        super(container);
+    public GuiGenericInventory(T menu, Inventory inventory, Component title, ResourceLocation texture) {
+        super(menu, inventory, title);
         this.texture = texture;
-        this.inventory = inventory;
     }
 
     @Override
-    public void initGui() {
-        super.initGui();
-        // Help button (top-right) - opens the Patchouli guide book. Hidden when general.show_help_button is false.
-        if (toast.utilityMobs.Properties.getBoolean(toast.utilityMobs.Properties.GENERAL, "show_help_button")) {
-            this.buttonList.add(new GuiBorderedButton(90, this.guiLeft + this.xSize - 20, this.guiTop + 4, 16, 16, "?"));
+    protected void init() {
+        super.init();
+        // Help button (top-right) - opens the Patchouli guide book. Hidden when general.show_help_button
+        // is false, or when Patchouli is absent and there is no book to open.
+        if (toast.utilityMobs.GuideBook.showHelpButton()) {
+            this.addRenderableWidget(HelpButton.build(this.leftPos + this.imageWidth - 20, this.topPos + 4, 16,
+                b -> toast.utilityMobs.GuideBook.openClient(),
+                Component.translatable("utilitymobs.gui.help"),
+                Component.translatable("utilitymobs.gui.help.desc")));
         }
     }
 
     @Override
-    protected void actionPerformed(GuiButton button) throws IOException {
-        if (button.id == 90) {
-            vazkii.patchouli.api.PatchouliAPI.instance.openBookGUI(GuideBook.BOOK_RL);
-            return;
-        }
-        super.actionPerformed(button);
+    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
+        graphics.drawString(this.font, this.title, this.imageWidth / 2 - this.font.width(this.title) / 2, 6, 4210752, false);
+        graphics.drawString(this.font, this.playerInventoryTitle, 8, this.imageHeight - 96 + 2, 4210752, false);
     }
 
     @Override
-    protected void drawGuiContainerForegroundLayer(int mouseX, int mouseY) {
-        String s = this.inventory.hasCustomName() ? this.inventory.getName() : I18n.format(this.inventory.getName());
-        this.fontRenderer.drawString(s, this.xSize / 2 - this.fontRenderer.getStringWidth(s) / 2, 6, 4210752);
-        this.fontRenderer.drawString(I18n.format("container.inventory"), 8, this.ySize - 96 + 2, 4210752);
+    protected void renderBg(GuiGraphics graphics, float partialTicks, int mouseX, int mouseY) {
+        int x = (this.width - this.imageWidth) / 2;
+        int y = (this.height - this.imageHeight) / 2;
+        graphics.blit(this.texture, x, y, 0, 0, this.imageWidth, this.imageHeight);
     }
 
     @Override
-    protected void drawGuiContainerBackgroundLayer(float partialTicks, int mouseX, int mouseY) {
-        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        this.mc.getTextureManager().bindTexture(this.texture);
-        int x = (this.width - this.xSize) / 2;
-        int y = (this.height - this.ySize) / 2;
-        this.drawTexturedModalRect(x, y, 0, 0, this.xSize, this.ySize);
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+        this.renderBackground(graphics);
+        super.render(graphics, mouseX, mouseY, partialTicks);
+        this.renderTooltip(graphics, mouseX, mouseY);
     }
 }

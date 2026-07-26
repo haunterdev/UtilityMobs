@@ -1,33 +1,30 @@
 package toast.utilityMobs.network;
 
-import io.netty.buffer.ByteBuf;
-import toast.utilityMobs.TargetHelper;
-import net.minecraftforge.fml.client.FMLClientHandler;
-import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
-import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
-import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
+import java.util.function.Supplier;
 
-public class MessageFetchTargetHelper implements IMessage {
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
+import net.minecraftforge.network.NetworkEvent;
+
+/// Server -> client on login: asks the client to push its own target helper back to the server.
+public class MessageFetchTargetHelper {
 
     public MessageFetchTargetHelper() {
     }
 
-    @Override
-    public void fromBytes(ByteBuf buf) {
-        buf.readByte(); // Empty packets break things.
-    }
-
-    @Override
-    public void toBytes(ByteBuf buf) {
+    public static void encode(MessageFetchTargetHelper message, FriendlyByteBuf buf) {
         buf.writeByte(0); // Empty packets break things.
     }
 
-    public static class Handler implements IMessageHandler<MessageFetchTargetHelper, IMessage> {
+    public static MessageFetchTargetHelper decode(FriendlyByteBuf buf) {
+        buf.readByte(); // Empty packets break things.
+        return new MessageFetchTargetHelper();
+    }
 
-        @Override
-        public IMessage onMessage(MessageFetchTargetHelper message, MessageContext ctx) {
-            return new MessageTargetHelper(TargetHelper.getTargetHelper(FMLClientHandler.instance().getClientPlayerEntity().getName()));
-        }
-
+    public static void handle(MessageFetchTargetHelper message, Supplier<NetworkEvent.Context> ctx) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+            () -> () -> toast.utilityMobs.client.UMClientNetwork.replyWithTargetHelper());
+        ctx.get().setPacketHandled(true);
     }
 }

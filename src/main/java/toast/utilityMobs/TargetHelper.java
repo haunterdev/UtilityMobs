@@ -1,7 +1,5 @@
 package toast.utilityMobs;
 
-import io.netty.buffer.ByteBuf;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -9,30 +7,34 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityList;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.IEntityOwnable;
-import net.minecraft.entity.monster.IMob;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.EntityPlayerMP;
-import net.minecraft.init.Items;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagList;
-import net.minecraft.nbt.NBTTagString;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.ResourceLocation;
-import net.minecraft.world.World;
-import net.minecraft.world.WorldServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.OwnableEntity;
+import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
+import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.server.ServerLifecycleHooks;
 import toast.utilityMobs.golem.EntityUtilityGolem;
 import toast.utilityMobs.network.MessageFetchTargetHelper;
 import toast.utilityMobs.network.MessageTargetHelper;
-import net.minecraftforge.fml.common.FMLCommonHandler;
-import net.minecraftforge.fml.common.network.ByteBufUtils;
-import net.minecraftforge.fml.relauncher.Side;
+import toast.utilityMobs.network.UMChannel;
 
 public class TargetHelper
 {
@@ -46,8 +48,33 @@ public class TargetHelper
     public static final byte PERMISSION_OPEN = (byte)(1 << 2);
     // The highest permission value.
     public static final byte HIGHEST_PERMISSION = TargetHelper.PERMISSION_OPEN;
-    // If true, mobs attack all players.
-    public static final boolean HOSTILE = Properties.getBoolean(Properties.GENERAL, "hostile");
+    // If true, mobs attack all players. (Non-final in 1.20.1: the TOML config is not readable at
+    // class-init time, so Properties.reload() pushes the value here on every config (re)load.)
+    public static boolean HOSTILE = false;
+
+    /**
+     * Lazy Class -> entity registry id cache. 1.12.2 could map both ways through EntityList; 1.20.1's
+     * EntityType hides the entity class, so the reverse (class -> id) is learned from live entities as
+     * they are seen (every entity passing through the list matchers or book interactions records itself).
+     * Registry-id entries that cannot be resolved to a class yet are kept as raw id strings in the *Ids
+     * sets and matched against an entity's OWN registry key at check time, which is order-independent.
+     */
+    private static final HashMap<Class<?>, String> CLASS_TO_ID = new HashMap<>();
+    /// Learned id -> class mappings (populated alongside CLASS_TO_ID from live entities).
+    private static final HashMap<String, Class<?>> ID_TO_CLASS = new HashMap<>();
+
+    /// Records a live entity's class <-> registry id mapping.
+    private static void learn(Entity entity) {
+        Class<?> entityClass = entity.getClass();
+        if (!CLASS_TO_ID.containsKey(entityClass)) {
+            ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
+            if (key != null) {
+                String id = key.toString().toLowerCase(Locale.ROOT);
+                CLASS_TO_ID.put(entityClass, id);
+                ID_TO_CLASS.putIfAbsent(id, entityClass);
+            }
+        }
+    }
 
     // The owner of the golems using this target helper.
     public String owner;
@@ -56,48 +83,36 @@ public class TargetHelper
     // Player permissions for this target helper.
     private HashMap<String, Byte> permissions = new HashMap<String, Byte>();
     // Mob class blacklist for this target helper.
-    private HashSet<Class> mobBlacklist = new HashSet<Class>();
+    private HashSet<Class<?>> mobBlacklist = new HashSet<>();
+    // Registry-id form of the per-helper blacklist (entries whose class is not yet known).
+    private LinkedHashSet<String> mobBlacklistIds = new LinkedHashSet<>();
 
-    // Global, config-driven attack blacklist (general.attack_blacklist). Entity classes here are NEVER
-    // targeted by any golem/turret, regardless of owner target books or the attack_* toggles. Shared by
-    // all target helpers; rebuilt from config on every Properties.load() (init + in-game config save).
-    private static final HashSet<Class> GLOBAL_BLACKLIST = new HashSet<Class>();
-    // Registry-id form of the global blacklist. An entry is matched against an entity's OWN registry key at
-    // check time, so a modded id (e.g. lycanitesmobs:cinder) still blocks even when its class could not be
-    // resolved at load time because that mod registered its entities after us (mod load order). This is the
-    // fix for "modded entities added to attack_blacklist are ignored while vanilla works": vanilla classes
-    // always resolve at our preInit, modded ones may not - id matching is order-independent.
-    private static final HashSet<String> GLOBAL_BLACKLIST_IDS = new HashSet<String>();
-    // Global, config-driven attack WHITELIST (general.attack_whitelist). Entity types here are ALWAYS valid
-    // targets even when the matching attack_* category toggle is off (e.g. target one passive/modded mob
-    // without enabling all passives). The blacklist and owner/friendly checks still take precedence. Same
-    // class + registry-id dual matching as the blacklist above.
-    private static final HashSet<Class> GLOBAL_WHITELIST = new HashSet<Class>();
-    private static final HashSet<String> GLOBAL_WHITELIST_IDS = new HashSet<String>();
+    // Global, config-driven attack blacklist (general.attack_blacklist).
+    private static final HashSet<Class<?>> GLOBAL_BLACKLIST = new HashSet<>();
+    private static final HashSet<String> GLOBAL_BLACKLIST_IDS = new HashSet<>();
+    // Global, config-driven attack WHITELIST (general.attack_whitelist).
+    private static final HashSet<Class<?>> GLOBAL_WHITELIST = new HashSet<>();
+    private static final HashSet<String> GLOBAL_WHITELIST_IDS = new HashSet<>();
     // Mob class whitelist for this target helper.
-    private ArrayList<Class> mobWhitelist = new ArrayList<Class>();
-    // Memoizes isWhitelisted() results per concrete entity Class. isWhitelisted loops the whitelist
-    // doing reflective isAssignableFrom for every scanned entity; at high golem counts that is a hot
-    // path. The set of entity classes in a world is tiny and bounded, so this caches to O(1) after
-    // first sight. Cleared whenever the whitelist changes (whitelist/unwhitelist/load).
-    private final HashMap<Class, Boolean> whitelistCache = new HashMap<Class, Boolean>();
+    private ArrayList<Class<?>> mobWhitelist = new ArrayList<>();
+    // Registry-id form of the per-helper whitelist (entries whose class is not yet known).
+    private LinkedHashSet<String> mobWhitelistIds = new LinkedHashSet<>();
+    // Memoizes isWhitelisted() results per concrete entity Class (hot path at high golem counts).
+    // Cleared whenever the whitelist changes (whitelist/unwhitelist/load).
+    private final HashMap<Class<?>, Boolean> whitelistCache = new HashMap<>();
 
     // Per-class cache of a mod's reflective boolean isHostile() method (Optional-style: absent key = not
-    // looked up yet, mapped-to-null = looked up, no such method). Lets us detect modded hostiles (e.g.
-    // Lycanites) that track hostility on their own base class instead of implementing vanilla IMob, without
-    // paying the reflection lookup on every target scan. The result is NOT cached (isHostile() can change at
-    // runtime, e.g. a tamed creature), only the Method handle.
-    private static final HashMap<Class, java.lang.reflect.Method> HOSTILE_METHOD_CACHE = new HashMap<Class, java.lang.reflect.Method>();
+    // looked up yet, mapped-to-null = looked up, no such method). Lets us detect modded hostiles that
+    // track hostility on their own base class instead of implementing vanilla Enemy.
+    private static final HashMap<Class<?>, java.lang.reflect.Method> HOSTILE_METHOD_CACHE = new HashMap<>();
 
     /** Broad "is this a hostile mob" test used by the target-category gate so modded hostiles are attacked
-        out of the box, not just vanilla IMob. Matches, in order: vanilla IMob; anything whose creature type
-        is MONSTER (mods that override isCreatureType); and a reflective no-arg boolean isHostile() returning
-        true (covers Lycanites Mobs and similar frameworks that don't implement IMob). */
+        out of the box, not just vanilla Enemy. Matches, in order: vanilla Enemy; anything registered in the
+        MONSTER category; and a reflective no-arg boolean isHostile() returning true. */
     public static boolean isHostileMob(Entity entity) {
-        if (entity instanceof IMob)
+        if (entity instanceof Enemy)
             return true;
-        if (entity instanceof net.minecraft.entity.EntityLiving
-                && ((net.minecraft.entity.EntityLiving) entity).isCreatureType(net.minecraft.entity.EnumCreatureType.MONSTER, false))
+        if (entity instanceof Mob && entity.getType().getCategory() == MobCategory.MONSTER)
             return true;
         Boolean reflective = TargetHelper.reflectiveIsHostile(entity);
         return reflective != null && reflective.booleanValue();
@@ -106,7 +121,7 @@ public class TargetHelper
     // Invokes a cached, reflectively-found no-arg boolean isHostile() on the entity, or null if the class
     // has no such method (or the call fails). Method handle is resolved once per class and cached.
     private static Boolean reflectiveIsHostile(Entity entity) {
-        Class entityClass = entity.getClass();
+        Class<?> entityClass = entity.getClass();
         java.lang.reflect.Method method;
         if (HOSTILE_METHOD_CACHE.containsKey(entityClass)) {
             method = HOSTILE_METHOD_CACHE.get(entityClass);
@@ -138,13 +153,16 @@ public class TargetHelper
     /** Fixed set of vanilla "neutral" mobs (don't attack unprovoked). Used by the hostile/
         neutral/passive target gate so players can choose to leave these alone. */
     public static boolean isNeutralMob(Entity entity) {
-        return entity instanceof net.minecraft.entity.monster.EntityEnderman
-            || entity instanceof net.minecraft.entity.monster.EntityPigZombie
-            || entity instanceof net.minecraft.entity.monster.EntitySpider      // + EntityCaveSpider (subclass)
-            || entity instanceof net.minecraft.entity.monster.EntityPolarBear
-            || entity instanceof net.minecraft.entity.monster.EntityIronGolem
-            || entity instanceof net.minecraft.entity.passive.EntityWolf
-            || entity instanceof net.minecraft.entity.passive.EntityLlama;
+        return entity instanceof net.minecraft.world.entity.monster.EnderMan
+            || entity instanceof net.minecraft.world.entity.monster.ZombifiedPiglin
+            || entity instanceof net.minecraft.world.entity.monster.Spider      // + CaveSpider (subclass)
+            || entity instanceof net.minecraft.world.entity.animal.PolarBear
+            || entity instanceof net.minecraft.world.entity.animal.IronGolem
+            || entity instanceof net.minecraft.world.entity.animal.Wolf
+            || entity instanceof net.minecraft.world.entity.animal.horse.Llama
+            || entity instanceof net.minecraft.world.entity.animal.Bee
+            || entity instanceof net.minecraft.world.entity.monster.piglin.Piglin
+            || entity instanceof net.minecraft.world.entity.animal.Panda;
     }
 
     private TargetHelper(String username) {
@@ -156,18 +174,13 @@ public class TargetHelper
             }
             else {
                 this.setPermissions(this.owner, 7);
-                this.whitelist(EntityPlayer.class);
+                this.whitelist(Player.class);
                 this.whitelist(EntityUtilityGolem.class);
-                // Whitelist every living thing. isValidTarget() requires whitelist membership, so a
-                // passive mob (cow, sheep, ...) that is NOT covered here can never be attacked even
-                // when the turret's "Passives" toggle is on or golems.attack_passives is true - the
-                // whitelist silently vetoes it. EntityLivingBase is the broadest entry that covers
-                // both hostiles and passives; the actual hostile/passive split is then decided by the
-                // category gate (passesTargetFilter: turret GUI flags / golems.attack_passives), and
-                // players still exclude specific mobs via the blacklist. The IMob entry below is now
-                // redundant but kept for documentation ("Hostiles" in the book maps to it).
-                this.whitelist(EntityLivingBase.class);
-                this.whitelist(IMob.class);
+                // Whitelist every living thing. isValidTarget() requires whitelist membership; the actual
+                // hostile/passive split is then decided by the category gate (passesTargetFilter). The
+                // Enemy entry below is redundant but kept for documentation ("Hostiles" maps to it).
+                this.whitelist(LivingEntity.class);
+                this.whitelist(Enemy.class);
             }
         }
     }
@@ -186,43 +199,37 @@ public class TargetHelper
 
     // Returns true if the entity has an owner tag.
     public static boolean hasOwner(Entity entity) {
-        return entity.getEntityData().hasKey("UM|owner");
+        return entity.getPersistentData().contains("UM|owner");
     }
 
     // Gets the target helper for the owner of the entity and loads it, if needed.
     public static TargetHelper getOwnerTargetHelper(Entity entity) {
-        return TargetHelper.getTargetHelper(entity.getEntityData().getString("UM|owner"));
+        return TargetHelper.getTargetHelper(entity.getPersistentData().getString("UM|owner"));
     }
 
     // Resolves the owner username of an ownable entity (golems track owner by name).
     private static String ownerNameOf(Entity entity) {
-        if (entity instanceof EntityUtilityGolem)
-            return ((EntityUtilityGolem)entity).getOwnerName();
-        if (entity instanceof IEntityOwnable) {
-            Entity owner = ((IEntityOwnable)entity).getOwner();
-            return owner == null ? null : owner.getName();
+        if (entity instanceof EntityUtilityGolem golem)
+            return golem.getOwnerName();
+        if (entity instanceof OwnableEntity ownable) {
+            Entity owner = ownable.getOwner();
+            return owner == null ? null : owner.getScoreboardName();
         }
         return null;
     }
 
     // Attempts to find the player on the server. Returns null if the player cannot be found.
-    public EntityPlayer getOwner() {
-        EntityPlayer player;
-        MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
-        if (server == null)
+    public Player getOwner() {
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null || this.owner == null)
             return null;
-        for (World world : server.worlds) {
-            player = world.getPlayerEntityByName(this.owner);
-            if (player != null)
-                return player;
-        }
-        return null;
+        return server.getPlayerList().getPlayerByName(this.owner);
     }
 
     // Sets the owner of a particular entity, usually an arrow or snowball.
     public void setOwned(Entity entity) {
         if (this.owner != null) {
-            entity.getEntityData().setString("UM|owner", this.owner);
+            entity.getPersistentData().putString("UM|owner", this.owner);
         }
     }
 
@@ -231,7 +238,7 @@ public class TargetHelper
         if (TargetHelper.HOSTILE)
             return true;
         else if (!this.permissions.containsKey(username))
-            return !this.isBlacklisted(EntityPlayer.class) && this.isWhitelisted(EntityPlayer.class);
+            return !this.isBlacklisted(Player.class) && this.isWhitelisted(Player.class);
         else
             return (this.permissions.get(username).byteValue() & TargetHelper.PERMISSION_TARGET) == 0;
     }
@@ -250,7 +257,7 @@ public class TargetHelper
 
     // Returns true if the given entity should continue to be attacked.
     public boolean maintainTarget(Entity entity) {
-        if (!(entity instanceof EntityLivingBase) || !entity.isEntityAlive())
+        if (!(entity instanceof LivingEntity) || !entity.isAlive())
             return false;
         return true;
     }
@@ -259,26 +266,35 @@ public class TargetHelper
     public boolean isValidTarget(Entity entity) {
         if (!this.maintainTarget(entity))
             return false;
+        TargetHelper.learn(entity);
         if (TargetHelper.isGloballyBlacklisted(entity))
             return false;
         if (this.owner == null)
-            return entity instanceof EntityUtilityGolem ? ((IEntityOwnable)entity).getOwner() != null : true;
-        if (entity instanceof IEntityOwnable) {
+            return entity instanceof EntityUtilityGolem golem ? golem.getOwner() != null : true;
+        if (entity instanceof OwnableEntity) {
             String ownerName = TargetHelper.ownerNameOf(entity);
             if (this.owner.equals(ownerName) || !this.canDamagePlayer(ownerName))
                 return false;
         }
-        if (entity instanceof EntityPlayer)
-            return this.canDamagePlayer(entity.getName());
-        Class entityClass = entity.getClass();
+        if (entity instanceof Player)
+            return this.canDamagePlayer(entity.getScoreboardName());
+        Class<?> entityClass = entity.getClass();
         // The per-player blacklist (target book "!entity") always wins - the owner explicitly said no.
-        if (this.isBlacklisted(entityClass))
+        if (this.isBlacklisted(entityClass) || this.matchesIdList(entity, this.mobBlacklistIds))
             return false;
         // The global attack whitelist forces the target through the per-player whitelist requirement; the
         // category gate (passive/neutral) is bypassed separately in EntityUtilityGolem.canAttackNoSight.
         if (TargetHelper.isGloballyWhitelisted(entity))
             return true;
-        return this.isWhitelisted(entityClass);
+        return this.isWhitelisted(entityClass) || this.matchesIdList(entity, this.mobWhitelistIds);
+    }
+
+    // True if the entity's own registry id appears in the given raw-id list.
+    private boolean matchesIdList(Entity entity, LinkedHashSet<String> ids) {
+        if (ids.isEmpty())
+            return false;
+        ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
+        return key != null && ids.contains(key.toString().toLowerCase(Locale.ROOT));
     }
 
     // Marks this target helper for deletion. Called every now-and-then on every target helper. They will reload themselves if still being used.
@@ -329,15 +345,15 @@ public class TargetHelper
     }
 
     // Functions for blacklisting/whitelisting mobs.
-    public void blacklist(Class entityClass) {
+    public void blacklist(Class<?> entityClass) {
         if (!this.isBlacklisted(entityClass) && this.isWhitelisted(entityClass)) {
             this.mobBlacklist.add(entityClass);
         }
     }
-    public void unblacklist(Class entityClass) {
+    public void unblacklist(Class<?> entityClass) {
         this.mobBlacklist.remove(entityClass);
     }
-    public void toggleBlacklist(Class entityClass) {
+    public void toggleBlacklist(Class<?> entityClass) {
         if (this.isBlacklisted(entityClass)) {
             this.unblacklist(entityClass);
         }
@@ -345,21 +361,19 @@ public class TargetHelper
             this.blacklist(entityClass);
         }
     }
-    public void whitelist(Class entityClass) {
+    public void whitelist(Class<?> entityClass) {
         this.whitelistCache.clear();
-        // Accept EntityLivingBase subclasses and the IMob interface (used to target all hostiles).
-        // Every concrete IMob is already an EntityLivingBase, so this only additionally admits the
-        // IMob interface class itself, which has no EntityLivingBase in its ancestry.
-        if (!this.mobWhitelist.contains(entityClass) && (EntityLivingBase.class.isAssignableFrom(entityClass) || IMob.class.isAssignableFrom(entityClass)) && this.clearWhitelistFor(entityClass)) {
+        // Accept LivingEntity subclasses and the Enemy interface (used to target all hostiles).
+        if (!this.mobWhitelist.contains(entityClass) && (LivingEntity.class.isAssignableFrom(entityClass) || Enemy.class.isAssignableFrom(entityClass)) && this.clearWhitelistFor(entityClass)) {
             this.mobWhitelist.add(entityClass);
         }
     }
-    public void unwhitelist(Class entityClass) {
+    public void unwhitelist(Class<?> entityClass) {
         this.whitelistCache.clear();
         this.clearBlacklistFor(entityClass);
         this.mobWhitelist.remove(entityClass);
     }
-    public void toggleWhitelist(Class entityClass) {
+    public void toggleWhitelist(Class<?> entityClass) {
         if (this.mobWhitelist.contains(entityClass)) {
             this.unwhitelist(entityClass);
         }
@@ -369,12 +383,12 @@ public class TargetHelper
     }
 
     // Returns true if the entity class is whitelisted or extends a whitelisted class.
-    public boolean isWhitelisted(Class entityClass) {
+    public boolean isWhitelisted(Class<?> entityClass) {
         Boolean cached = this.whitelistCache.get(entityClass);
         if (cached != null)
             return cached.booleanValue();
         boolean result = false;
-        for (Class allowedClass : this.mobWhitelist) if (allowedClass.isAssignableFrom(entityClass)) {
+        for (Class<?> allowedClass : this.mobWhitelist) if (allowedClass.isAssignableFrom(entityClass)) {
             result = true;
             break;
         }
@@ -382,15 +396,15 @@ public class TargetHelper
         return result;
     }
 
-    // Returns true if the entity class is whitelisted or extends a whitelisted class.
-    public boolean isBlacklisted(Class entityClass) {
+    // Returns true if the entity class is blacklisted.
+    public boolean isBlacklisted(Class<?> entityClass) {
         return this.mobBlacklist.contains(entityClass);
     }
 
     // Ensures that there is no over-definition in the whitelist when a whitelist entry is added.
-    private boolean clearWhitelistFor(Class entityClass) {
-        Class allowedClass;
-        for (Iterator<Class> iterator = this.mobWhitelist.iterator(); iterator.hasNext() && (allowedClass = iterator.next()) != null;) {
+    private boolean clearWhitelistFor(Class<?> entityClass) {
+        Class<?> allowedClass;
+        for (Iterator<Class<?>> iterator = this.mobWhitelist.iterator(); iterator.hasNext() && (allowedClass = iterator.next()) != null;) {
             if (allowedClass.isAssignableFrom(entityClass))
                 return false;
             if (entityClass.isAssignableFrom(allowedClass)) {
@@ -401,9 +415,9 @@ public class TargetHelper
     }
 
     // Ensures that there are no unneeded blacklist entries when a whitelist entry is removed.
-    private void clearBlacklistFor(Class entityClass) {
-        Class disallowedClass;
-        for (Iterator<Class> iterator = this.mobBlacklist.iterator(); iterator.hasNext() && (disallowedClass = iterator.next()) != null;) if (entityClass.isAssignableFrom(disallowedClass)) {
+    private void clearBlacklistFor(Class<?> entityClass) {
+        Class<?> disallowedClass;
+        for (Iterator<Class<?>> iterator = this.mobBlacklist.iterator(); iterator.hasNext() && (disallowedClass = iterator.next()) != null;) if (entityClass.isAssignableFrom(disallowedClass)) {
             iterator.remove();
         }
     }
@@ -440,12 +454,18 @@ public class TargetHelper
                 out.write("\n" + Integer.toBinaryString(entry.getValue().intValue()) + " " + entry.getKey());
             }
             out.write("\n\nwhitelist");
-            for (Class entityClass : this.mobWhitelist) {
+            for (Class<?> entityClass : this.mobWhitelist) {
                 out.write("\n" + TargetHelper.classToString(entityClass));
             }
+            for (String id : this.mobWhitelistIds) {
+                out.write("\n" + id);
+            }
             out.write("\n\nblacklist");
-            for (Class entityClass : this.mobBlacklist) {
+            for (Class<?> entityClass : this.mobBlacklist) {
                 out.write("\n" + TargetHelper.classToString(entityClass));
+            }
+            for (String id : this.mobBlacklistIds) {
+                out.write("\n" + id);
             }
             out.close();
             save.delete();
@@ -458,32 +478,38 @@ public class TargetHelper
     }
 
     // Saves this target helper to the byte buffer to send to the client.
-    public void save(ByteBuf buf) {
+    public void save(FriendlyByteBuf buf) {
         if (this.owner == null || this.destroyed()) {
-            ByteBufUtils.writeUTF8String(buf, "");
-            ByteBufUtils.writeUTF8String(buf, "");
-            ByteBufUtils.writeUTF8String(buf, "");
+            buf.writeUtf("");
+            buf.writeUtf("");
+            buf.writeUtf("");
             return;
         }
-        String list;
+        StringBuilder list;
 
-        list = "";
+        list = new StringBuilder();
         for (Map.Entry<String, Byte> entry : this.permissions.entrySet()) {
-            list += "\n" + Integer.toBinaryString(entry.getValue().intValue()) + " " + entry.getKey();
+            list.append("\n").append(Integer.toBinaryString(entry.getValue().intValue())).append(" ").append(entry.getKey());
         }
-        ByteBufUtils.writeUTF8String(buf, list);
+        buf.writeUtf(list.toString());
 
-        list = "";
-        for (Class entityClass : this.mobWhitelist) {
-            list += "\n" + TargetHelper.classToString(entityClass);
+        list = new StringBuilder();
+        for (Class<?> entityClass : this.mobWhitelist) {
+            list.append("\n").append(TargetHelper.classToString(entityClass));
         }
-        ByteBufUtils.writeUTF8String(buf, list);
+        for (String id : this.mobWhitelistIds) {
+            list.append("\n").append(id);
+        }
+        buf.writeUtf(list.toString());
 
-        list = "";
-        for (Class entityClass : this.mobBlacklist) {
-            list += "\n" + TargetHelper.classToString(entityClass);
+        list = new StringBuilder();
+        for (Class<?> entityClass : this.mobBlacklist) {
+            list.append("\n").append(TargetHelper.classToString(entityClass));
         }
-        ByteBufUtils.writeUTF8String(buf, list);
+        for (String id : this.mobBlacklistIds) {
+            list.append("\n").append(id);
+        }
+        buf.writeUtf(list.toString());
     }
 
     // Loads this target helper from the config.
@@ -493,7 +519,10 @@ public class TargetHelper
         try {
             this.permissions.clear();
             this.mobBlacklist.clear();
+            this.mobBlacklistIds.clear();
             this.mobWhitelist.clear();
+            this.mobWhitelistIds.clear();
+            this.whitelistCache.clear();
             File save = new File(TargetHelper.SAVE_DIRECTORY, this.owner + ".txt");
             if (!save.exists())
                 return;
@@ -537,22 +566,10 @@ public class TargetHelper
                             }
                         }
                         else if (key.equalsIgnoreCase("whitelist")) {
-                            Class entry = TargetHelper.stringToClass(value);
-                            if (entry == null) {
-                                _UtilityMobs.console("Invalid whitelist entry: " + value + " (" + this.owner + ".txt)!");
-                            }
-                            else {
-                                this.whitelist(entry);
-                            }
+                            this.addListEntry(value, false);
                         }
                         else if (key.equalsIgnoreCase("blacklist")) {
-                            Class entry = TargetHelper.stringToClass(value);
-                            if (entry == null) {
-                                _UtilityMobs.console("Invalid blacklist entry: " + value + " (" + this.owner + ".txt)!");
-                            }
-                            else {
-                                this.blacklist(entry);
-                            }
+                            this.addListEntry(value, true);
                         }
                         value = "";
                     }
@@ -571,25 +588,50 @@ public class TargetHelper
             _UtilityMobs.console("Failed to load target data (" + this.owner + ".txt)!");
             ex.printStackTrace();
         }
-        // Migration: target books saved before EntityLivingBase became the broad default only
-        // whitelisted IMob, so non-IMob neutrals/passives (iron golems, wolves, llamas, ...) were
-        // silently vetoed regardless of the category toggles. Re-assert the broad entry so the
-        // hostile/neutral/passive gate is what actually decides. Idempotent (whitelist() de-dupes).
-        this.whitelist(EntityLivingBase.class);
+        // Keep the broad default present so the hostile/neutral/passive gate is what actually decides.
+        this.whitelist(LivingEntity.class);
+    }
+
+    /// Adds a parsed save/book/packet line to the white- or blacklist, falling back to the raw-id
+    /// sets when the class cannot be resolved (unseen modded/vanilla entity - matched by id instead).
+    private void addListEntry(String value, boolean toBlacklist) {
+        Class<?> entry = TargetHelper.stringToClass(value);
+        if (entry != null) {
+            if (toBlacklist) {
+                this.blacklist(entry);
+            }
+            else {
+                this.whitelist(entry);
+            }
+        }
+        else if (value.indexOf(':') >= 0) {
+            if (toBlacklist) {
+                this.mobBlacklistIds.add(value.toLowerCase(Locale.ROOT));
+            }
+            else {
+                this.mobWhitelistIds.add(value.toLowerCase(Locale.ROOT));
+            }
+        }
+        else {
+            _UtilityMobs.console("Invalid " + (toBlacklist ? "blacklist" : "whitelist") + " entry: " + value + " (" + this.owner + ")!");
+        }
     }
 
     // Loads this target helper from the byte buffer.
-    public void load(ByteBuf buf) {
+    public void load(FriendlyByteBuf buf) {
         if (this.owner == null || this.destroyed())
             return;
         try {
             this.permissions.clear();
             this.mobBlacklist.clear();
+            this.mobBlacklistIds.clear();
             this.mobWhitelist.clear();
+            this.mobWhitelistIds.clear();
+            this.whitelistCache.clear();
             String list = "";
-            list += "player_permissions" + ByteBufUtils.readUTF8String(buf);
-            list += "\n\nwhitelist" + ByteBufUtils.readUTF8String(buf);
-            list += "\n\nblacklist" + ByteBufUtils.readUTF8String(buf);
+            list += "player_permissions" + buf.readUtf();
+            list += "\n\nwhitelist" + buf.readUtf();
+            list += "\n\nblacklist" + buf.readUtf();
 
             byte status = 0;
             String key = "";
@@ -629,22 +671,10 @@ public class TargetHelper
                             }
                         }
                         else if (key.equalsIgnoreCase("whitelist")) {
-                            Class entry = TargetHelper.stringToClass(value);
-                            if (entry == null) {
-                                _UtilityMobs.console("Invalid whitelist entry: " + value + " (" + this.owner + " packet)!");
-                            }
-                            else {
-                                this.whitelist(entry);
-                            }
+                            this.addListEntry(value, false);
                         }
                         else if (key.equalsIgnoreCase("blacklist")) {
-                            Class entry = TargetHelper.stringToClass(value);
-                            if (entry == null) {
-                                _UtilityMobs.console("Invalid blacklist entry: " + value + " (" + this.owner + " packet)!");
-                            }
-                            else {
-                                this.blacklist(entry);
-                            }
+                            this.addListEntry(value, true);
                         }
                         value = "";
                     }
@@ -669,7 +699,7 @@ public class TargetHelper
     public static ItemStack book(int id) {
         ItemStack book = new ItemStack(Items.WRITABLE_BOOK);
         BookHelper.addPages(book, "");
-        book.getTagCompound().setByte("umt", (byte)id);
+        book.getOrCreateTag().putByte("umt", (byte)id);
         if (id == 0) {
             EffectHelper.setItemName(book, 0xb, "Player Permissions");
         }
@@ -692,7 +722,7 @@ public class TargetHelper
             return book;
         BookHelper.removePages(book);
         if (id == 0) {
-            book = TargetHelper.toWritable(book); // 1.12.2 cannot mutate an ItemStack's item in place
+            book = TargetHelper.toWritable(book); // Cannot mutate an ItemStack's item in place.
             EffectHelper.setItemName(book, 0xb, "Player Permissions");
             EffectHelper.setItemText(book, 0x7, "by " + this.owner);
             EffectHelper.setItemGlowing(book);
@@ -730,65 +760,79 @@ public class TargetHelper
                     " §7Mob Target List§0\n\nIf you do not save your changes, they will be erased the next time this book is right clicked!\nYou may also toggle entities by right clicking them.",
                     " §7Mob Target List§0\n\nIf you right click while sneaking, the entity will be toggled with a \'!\'.\nOtherwise, it will be toggled normally."
                     );
-            if (this.mobWhitelist.size() + this.mobBlacklist.size() <= 0) {
+            int totalEntries = this.mobWhitelist.size() + this.mobWhitelistIds.size() + this.mobBlacklist.size() + this.mobBlacklistIds.size();
+            if (totalEntries <= 0) {
                 BookHelper.addPages(book, " §lTarget List:§r\n<no entries>");
             }
             else {
                 // One line per entry, ~10 lines per page, +1 for the header line and +1 slack so the
-                // page index can never overrun (the old `whitelist + blacklist/10` mis-applied integer
-                // division and under-allocated when the blacklist was large, throwing mid-save).
-                String[] pages = new String[(this.mobWhitelist.size() + this.mobBlacklist.size()) / 10 + 2];
+                // page index can never overrun.
+                String[] pages = new String[totalEntries / 10 + 2];
                 int page = 0;
                 byte line = 1;
                 pages[0] = " §lTarget List:§r\n";
-                for (Class entityClass : this.mobWhitelist) {
+                for (Class<?> entityClass : this.mobWhitelist) {
                     if (line++ == 10) {
                         line = 0;
                         pages[++page] = "";
                     }
                     pages[page] += TargetHelper.classToString(entityClass) + "\n";
                 }
-                for (Class entityClass : this.mobBlacklist) {
+                for (String rawId : this.mobWhitelistIds) {
+                    if (line++ == 10) {
+                        line = 0;
+                        pages[++page] = "";
+                    }
+                    pages[page] += rawId + "\n";
+                }
+                for (Class<?> entityClass : this.mobBlacklist) {
                     if (++line == 10) {
                         line = 0;
                         pages[++page] = "";
                     }
                     pages[page] += "!" + TargetHelper.classToString(entityClass) + "\n";
                 }
+                for (String rawId : this.mobBlacklistIds) {
+                    if (++line == 10) {
+                        line = 0;
+                        pages[++page] = "";
+                    }
+                    pages[page] += "!" + rawId + "\n";
+                }
                 BookHelper.addPages(book, pages);
             }
         }
-        book.getTagCompound().setByte("umt", (byte)id);
+        book.getOrCreateTag().putByte("umt", (byte)id);
         return book;
     }
 
-    // Returns a writable_book carrying the given book's NBT (1.12.2 ItemStack items are immutable).
+    // Returns a writable_book carrying the given book's NBT (ItemStack items are immutable).
     private static ItemStack toWritable(ItemStack book) {
         if (book.getItem() == Items.WRITABLE_BOOK)
             return book;
         ItemStack writable = new ItemStack(Items.WRITABLE_BOOK);
-        if (book.getTagCompound() != null) {
-            writable.setTagCompound(book.getTagCompound());
+        if (book.getTag() != null) {
+            writable.setTag(book.getTag());
         }
         return writable;
     }
 
-    // Writes a target helper's specs to a book.
+    // Reads a target helper's specs from a book.
     public static void read(String username, ItemStack book) {
         TargetHelper.getTargetHelper(username).readFrom(book);
     }
     private void readFrom(ItemStack book) {
-        if (book == null || book.isEmpty() || book.getTagCompound() == null || !book.getTagCompound().hasKey("pages"))
+        if (book == null || book.isEmpty() || book.getTag() == null || !book.getTag().contains("pages"))
             return;
-        NBTTagList pages = book.getTagCompound().getTagList("pages", new NBTTagString("").getId());
-        byte id = book.getTagCompound().getByte("umt");
+        ListTag pages = book.getTag().getList("pages", Tag.TAG_STRING);
+        byte id = book.getTag().getByte("umt");
         String page;
         String line;
         int index;
         if (id == 0) {
             this.permissions.clear();
-            for (int p = 0; p < pages.tagCount(); p++) {
-                page = pages.getStringTagAt(p);
+            for (int p = 0; p < pages.size(); p++) {
+                page = pages.getString(p);
                 while ((index = page.indexOf("\n")) >= 0) {
                     line = page.substring(0, index);
                     page = page.substring(index + 1);
@@ -799,9 +843,12 @@ public class TargetHelper
         }
         else if (id == 1) {
             this.mobBlacklist.clear();
+            this.mobBlacklistIds.clear();
             this.mobWhitelist.clear();
-            for (int p = 0; p < pages.tagCount(); p++) {
-                page = pages.getStringTagAt(p);
+            this.mobWhitelistIds.clear();
+            this.whitelistCache.clear();
+            for (int p = 0; p < pages.size(); p++) {
+                page = pages.getString(p);
                 while ((index = page.indexOf("\n")) >= 0) {
                     line = page.substring(0, index);
                     page = page.substring(index + 1);
@@ -810,7 +857,7 @@ public class TargetHelper
                 this.readTargetListLine(page);
             }
             // Keep the broad default present even if an old book's pages don't list it (see load()).
-            this.whitelist(EntityLivingBase.class);
+            this.whitelist(LivingEntity.class);
         }
         this.writeTo(book, id);
         this.save();
@@ -837,53 +884,41 @@ public class TargetHelper
         if (blacklist) {
             line = line.substring(1);
         }
-        try {
-            Class entry = TargetHelper.stringToClass(line);
-            if (entry != null) {
-                // Declarative add (not toggle): readFrom() clears the lists first, so the saved list
-                // ends up exactly mirroring the book's pages. This makes save-on-exit idempotent -
-                // parsing the same pages twice yields the same list - and a duplicate line no longer
-                // cancels itself out.
-                if (blacklist) {
-                    this.blacklist(entry);
-                }
-                else {
-                    this.whitelist(entry);
-                }
-            }
-        }
-        catch (Exception ex) {
-            // Do nothing
-        }
+        if (line.isEmpty() || line.startsWith("§"))
+            return;
+        // Declarative add (not toggle): readFrom() clears the lists first, so the saved list
+        // ends up exactly mirroring the book's pages.
+        this.addListEntry(line, blacklist);
     }
 
     // Hash of a book's pages, used to detect when a player has edited and closed a target book.
     public static int signatureOf(ItemStack book) {
-        if (book == null || book.isEmpty() || book.getTagCompound() == null || !book.getTagCompound().hasKey("pages"))
+        if (book == null || book.isEmpty() || book.getTag() == null || !book.getTag().contains("pages"))
             return 0;
-        return book.getTagCompound().getTagList("pages", new NBTTagString("").getId()).toString().hashCode();
+        return book.getTag().getList("pages", Tag.TAG_STRING).toString().hashCode();
     }
 
     // Stamps the current page signature onto the book so the next tick won't re-parse unchanged pages.
     public static void stampSignature(ItemStack book) {
-        if (book != null && !book.isEmpty() && book.getTagCompound() != null) {
-            book.getTagCompound().setInteger("umh", TargetHelper.signatureOf(book));
+        if (book != null && !book.isEmpty() && book.getTag() != null) {
+            book.getTag().putInt("umh", TargetHelper.signatureOf(book));
         }
     }
 
     // Updates a target helper based on the entity interacted with.
-    public static void interact(String username, ItemStack book, int id, EntityLivingBase entity, boolean sneaking) {
+    public static void interact(String username, ItemStack book, int id, LivingEntity entity, boolean sneaking) {
         TargetHelper.getTargetHelper(username).interactWith(book, id, entity, sneaking);
     }
-    private void interactWith(ItemStack book, int id, EntityLivingBase entity, boolean sneaking) {
+    private void interactWith(ItemStack book, int id, LivingEntity entity, boolean sneaking) {
+        TargetHelper.learn(entity);
         if (id == 0) {
-            if (!(entity instanceof EntityPlayer))
+            if (!(entity instanceof Player))
                 return;
-            byte playerPermissions = this.getPermissions(entity.getName());
+            byte playerPermissions = this.getPermissions(entity.getScoreboardName());
             if (sneaking) {
                 if (playerPermissions > 0) {
                     for (byte permission = TargetHelper.HIGHEST_PERMISSION; permission > 0; permission >>= 1) if ((permission & playerPermissions) > 0) {
-                        this.remPermissions(entity.getName(), permission);
+                        this.remPermissions(entity.getScoreboardName(), permission);
                         this.save();
                         break;
                     }
@@ -891,7 +926,7 @@ public class TargetHelper
             }
             else {
                 for (byte permission = 1; permission <= TargetHelper.HIGHEST_PERMISSION; permission <<= 1) if ((permission & playerPermissions) == 0) {
-                    this.addPermissions(entity.getName(), permission);
+                    this.addPermissions(entity.getScoreboardName(), permission);
                     this.save();
                     break;
                 }
@@ -910,12 +945,12 @@ public class TargetHelper
     }
 
     // Called when a player logs in, to send his/her target helper to the server and send the server's handlers to the player.
-    public static void fetchTargetHelpers(EntityPlayer player) {
-        if (FMLCommonHandler.instance().getSide() == Side.SERVER && player instanceof EntityPlayerMP) {
-            _UtilityMobs.CHANNEL.sendTo(new MessageFetchTargetHelper(), (EntityPlayerMP)player);
+    public static void fetchTargetHelpers(Player player) {
+        if (player instanceof ServerPlayer serverPlayer) {
+            UMChannel.sendToPlayer(new MessageFetchTargetHelper(), serverPlayer);
             for (Map.Entry<String, TargetHelper> entry : TargetHelper.TARGET_HELPERS.entrySet()) {
                 if (entry.getKey() != null && !entry.getValue().destroyed()) {
-                    _UtilityMobs.CHANNEL.sendTo(new MessageTargetHelper(entry.getValue()), (EntityPlayerMP)player);
+                    UMChannel.sendToPlayer(new MessageTargetHelper(entry.getValue()), serverPlayer);
                 }
             }
         }
@@ -923,43 +958,42 @@ public class TargetHelper
 
     // Called when the target handler is updated to send changes to the server/other players.
     private void updateTargetHelper() {
-        if (FMLCommonHandler.instance().getSide() == Side.CLIENT) {
-            if (FMLCommonHandler.instance().getMinecraftServerInstance() == null && this.owner != null && this.owner.equals(_UtilityMobs.proxy.getPlayer())) {
-                _UtilityMobs.CHANNEL.sendToServer(new MessageTargetHelper(this));
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) {
+            // Pure client: push our own helper up to the server. 1.12.2 also required that no integrated
+            // server was running, which is the same null check.
+            if (this.owner != null && this.owner.equals(TargetHelper.localPlayerName())) {
+                UMChannel.sendToServer(new MessageTargetHelper(this));
             }
         }
         else {
-            MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
-            if (server != null) {
-                for (WorldServer world : server.worlds) {
-                    for (Object entity : new ArrayList(world.playerEntities)) {
-                        if (entity instanceof EntityPlayerMP && !this.owner.equals(((EntityPlayerMP) entity).getName())) {
-                            _UtilityMobs.CHANNEL.sendTo(new MessageTargetHelper(this), (EntityPlayerMP)entity);
-                        }
+            for (ServerLevel level : server.getAllLevels()) {
+                for (ServerPlayer player : new ArrayList<>(level.players())) {
+                    if (!this.owner.equals(player.getGameProfile().getName())) {
+                        UMChannel.sendToPlayer(new MessageTargetHelper(this), player);
                     }
                 }
             }
         }
     }
 
+    /// The logged-in client player's name, or null off the client. Kept behind DistExecutor so the
+    /// dedicated server never loads Minecraft.
+    private static String localPlayerName() {
+        return DistExecutor.unsafeCallWhenOn(Dist.CLIENT, () -> toast.utilityMobs.client.UMClientNetwork::localPlayerName);
+    }
+
     // Returns a loadable string from the class, if possible.
-    private static String classToString(Class entityClass) {
+    private static String classToString(Class<?> entityClass) {
         String name = null;
-        if (entityClass == EntityPlayer.class) {
+        if (entityClass == Player.class || Player.class.isAssignableFrom(entityClass)) {
             name = "Player";
         }
-        else if (entityClass == IMob.class) {
+        else if (entityClass == Enemy.class) {
             name = "Hostiles";
         }
         else {
-            try {
-                ResourceLocation key = EntityList.getKey((Class<? extends Entity>)entityClass);
-                if (key != null)
-                    name = key.toString();
-            }
-            catch (Exception ex) {
-                // Do nothing
-            }
+            name = TargetHelper.CLASS_TO_ID.get(entityClass);
             if (name == null) {
                 name = entityClass.getName();
             }
@@ -967,10 +1001,7 @@ public class TargetHelper
         return name;
     }
 
-    // Rebuilds the global attack blacklist from the config's general.attack_blacklist list. Each entry is
-    // an entity registry id (e.g. minecraft:cow), the tokens "Player"/"Hostiles", or a fully-qualified
-    // class name. Unresolvable entries are skipped (a modded id may not resolve until that mod has loaded;
-    // the list is rebuilt on the next reload). Called from Properties.load().
+    // Rebuilds the global attack blacklist from the config's general.attack_blacklist list.
     public static void loadGlobalBlacklist(String[] names) {
         TargetHelper.loadGlobalList(names, TargetHelper.GLOBAL_BLACKLIST, TargetHelper.GLOBAL_BLACKLIST_IDS, "attack_blacklist");
     }
@@ -981,9 +1012,9 @@ public class TargetHelper
     }
 
     // Shared parser for both global lists. Resolves each entry to a class when possible (keeps subclass
-    // coverage) AND remembers the registry-id form for any namespaced entry, so a modded id still matches by
-    // the entity's own key even if its class can't be resolved at this lifecycle stage (mod load order).
-    private static void loadGlobalList(String[] names, HashSet<Class> classes, HashSet<String> ids, String label) {
+    // coverage) AND remembers the registry-id form for any namespaced entry, so a modded id still matches
+    // by the entity's own key even if its class can't be resolved at this lifecycle stage.
+    private static void loadGlobalList(String[] names, HashSet<Class<?>> classes, HashSet<String> ids, String label) {
         classes.clear();
         ids.clear();
         if (names == null)
@@ -992,7 +1023,7 @@ public class TargetHelper
             if (raw == null || raw.trim().isEmpty())
                 continue;
             String name = raw.trim();
-            Class entry = TargetHelper.stringToClass(name);
+            Class<?> entry = TargetHelper.stringToClass(name);
             if (entry != null) {
                 classes.add(entry);
             }
@@ -1016,42 +1047,40 @@ public class TargetHelper
         return TargetHelper.matchesGlobalList(entity, TargetHelper.GLOBAL_WHITELIST, TargetHelper.GLOBAL_WHITELIST_IDS);
     }
 
-    // Matches an entity against a global list by class (covers subclasses of a resolved entry) OR by its own
-    // registry id (covers modded entries whose class never resolved). Order-independent, so it is robust to
-    // mod load order - the root cause of modded ids being silently ignored before.
-    private static boolean matchesGlobalList(Entity entity, HashSet<Class> classes, HashSet<String> ids) {
+    // Matches an entity against a global list by class (covers subclasses of a resolved entry) OR by its
+    // own registry id (covers entries whose class never resolved). Order-independent.
+    private static boolean matchesGlobalList(Entity entity, HashSet<Class<?>> classes, HashSet<String> ids) {
         if (classes.isEmpty() && ids.isEmpty())
             return false;
-        Class entityClass = entity.getClass();
-        for (Class listed : classes) {
+        TargetHelper.learn(entity);
+        Class<?> entityClass = entity.getClass();
+        for (Class<?> listed : classes) {
             if (listed.isAssignableFrom(entityClass))
                 return true;
         }
         if (!ids.isEmpty()) {
-            ResourceLocation key = EntityList.getKey(entity);
+            ResourceLocation key = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
             if (key != null && ids.contains(key.toString().toLowerCase(Locale.ROOT)))
                 return true;
         }
         return false;
     }
 
-    // Attempts to load a class from the given string.
-    private static Class stringToClass(String line) {
-        Class entityClass = null;
+    // Attempts to load a class from the given string. Registry ids resolve only after their entity class
+    // has been learned from a live instance (see CLASS_TO_ID); callers fall back to raw-id matching.
+    private static Class<?> stringToClass(String line) {
+        Class<?> entityClass = null;
         if (line.equals("Player")) {
-            entityClass = EntityPlayer.class;
+            entityClass = Player.class;
         }
         else if (line.equals("Hostiles")) {
-            entityClass = IMob.class;
+            entityClass = Enemy.class;
         }
         else {
-            try {
-                entityClass = EntityList.getClass(new ResourceLocation(line));
+            if (line.indexOf(':') >= 0) {
+                entityClass = TargetHelper.ID_TO_CLASS.get(line.toLowerCase(Locale.ROOT));
             }
-            catch (Exception ex) {
-                // Do nothing
-            }
-            if (entityClass == null) {
+            if (entityClass == null && line.indexOf(':') < 0) {
                 try {
                     entityClass = Class.forName(line);
                 }

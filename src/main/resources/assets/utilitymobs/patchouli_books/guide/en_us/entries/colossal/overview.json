@@ -1,7 +1,7 @@
 {
   "name": "Building a Colossus",
   "category": "utilitymobs:colossal",
-  "icon": "minecraft:skull",
+  "icon": "minecraft:skeleton_skull",
   "sortnum": 0,
   "pages": [
     { "type": "text", "text": "A colossus is a giant golem built from a single block type. Assemble the large body, then place any mob head on the SIDE of the structure to bring it to life." },

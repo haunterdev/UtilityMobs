@@ -20,7 +20,7 @@
           ]
         ],
         "mapping": {
-          "P": "minecraft:pumpkin[facing=north]",
+          "P": "minecraft:carved_pumpkin[facing=north]",
           "O": "minecraft:obsidian",
           "0": "minecraft:obsidian"
         }
@@ -29,7 +29,7 @@
     },
     {
       "type": "entity",
-      "entity": "utilitymobs:obsidiangolem",
+      "entity": "utilitymobs:obsidian_golem",
       "name": "Obsidian Golem",
       "text": "Health: 100  Armor: 20$(br)Damage: 2  Speed: 2.5"
     },

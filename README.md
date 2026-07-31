@@ -9,7 +9,7 @@
 A 1.20.1 Forge port of [Utility Mobs: Redux](https://github.com/haunterdev/UtilityMobs/tree/1.12.2),
 which is itself a port and extension of [FatherToast's Utility Mobs](https://www.curseforge.com/minecraft/mc-mods/utility-mobs).
 
-Looking for the 1.12.2 version? It here -> [`1.12.2` branch](https://github.com/haunterdev/UtilityMobs/tree/1.12.2).
+Looking for the 1.12.2 version? Its here -> [`1.12.2` branch](https://github.com/haunterdev/UtilityMobs/tree/1.12.2).
 
 ## Features
 

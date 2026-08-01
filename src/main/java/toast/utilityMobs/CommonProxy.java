@@ -1,8 +1,8 @@
 package toast.utilityMobs;
 
 import toast.utilityMobs.block.EntityJukeboxGolem;
+import toast.utilityMobs.network.MessageExplosion;
 import net.minecraft.entity.Entity;
-import net.minecraftforge.fml.server.FMLServerHandler;
 
 public class CommonProxy
 {
@@ -32,13 +32,21 @@ public class CommonProxy
         // Client method
     }
 
+    // Handles an incoming heal-number packet on the client's main thread.
+    // Lives on the proxy so the packet handler itself stays free of client-only classes and can be
+    // registered (and therefore encoded) on a dedicated server.
+    public void handleHealNumber(int entityId, float amount) {
+        // Client method
+    }
+
+    // Handles an incoming explosion-effect packet on the client's main thread. Same reason as above.
+    public void handleExplosionFx(MessageExplosion message) {
+        // Client method
+    }
+
     // Called at the end of each client tick.
     public void handleClientTick() {
         // Client method
     }
 
-    // Returns true if entities are allowed to block movement. Namely, if they can be stood on.
-    public boolean solidEntities() {
-        return !FMLServerHandler.instance().getServer().isDedicatedServer();
-    }
 }

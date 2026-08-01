@@ -7,7 +7,6 @@ import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.PlayerEvent;
-import vazkii.patchouli.api.PatchouliAPI;
 
 /**
     Glue for the Patchouli guide book ("utilitymobs:guide"). Provides the book
@@ -24,19 +23,21 @@ public final class GuideBook
     public GuideBook() {}
 
     // A fresh guide-book stack (Patchouli guide_book item carrying this book's id).
+    // Empty when Patchouli is not installed - it is a soft dependency (issue #1.6).
     public static ItemStack stack() {
-        return PatchouliAPI.instance.getBookStack(BOOK_ID);
+        return PatchouliCompat.bookStack(BOOK_ID);
     }
 
     // Server-side: open the guide book GUI for a player.
     public static void open(EntityPlayer player) {
         if (player instanceof EntityPlayerMP) {
-            PatchouliAPI.instance.openBookGUI((EntityPlayerMP) player, BOOK_RL);
+            PatchouliCompat.openBook((EntityPlayerMP) player, BOOK_RL);
         }
     }
 
     @SubscribeEvent
     public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!PatchouliCompat.isLoaded()) return;
         if (!Properties.getBoolean(Properties.GENERAL, "give_book_on_first_join")) return;
         EntityPlayer player = event.player;
         if (player.world.isRemote) return;

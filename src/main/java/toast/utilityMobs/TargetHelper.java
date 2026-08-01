@@ -46,8 +46,18 @@ public class TargetHelper
     public static final byte PERMISSION_OPEN = (byte)(1 << 2);
     // The highest permission value.
     public static final byte HIGHEST_PERMISSION = TargetHelper.PERMISSION_OPEN;
-    // If true, mobs attack all players.
-    public static final boolean HOSTILE = Properties.getBoolean(Properties.GENERAL, "hostile");
+    // If true, mobs attack all players. Set from general.hostile in Properties.load().
+    // This used to be a `static final` read in the class initializer, which fired exactly once per JVM. The
+    // in-game config GUI writes the new value and calls Properties.reload(), and every other option is
+    // re-pushed from load() - this one was not, so ticking "hostile" on and saving appeared to do nothing
+    // (golems went on ignoring the player) until the game was restarted.
+    public static boolean hostile = false;
+    // If true, any player may use/open any golem, whatever the owner's permission list says.
+    // Set from general.public_use in Properties.load(). Issue #16.
+    public static boolean publicUse = false;
+    // If true, no golem ever targets a player, whatever the owner's permission list says.
+    // Set from general.passive_to_players in Properties.load(). Issue #16.
+    public static boolean passiveToPlayers = false;
 
     // The owner of the golems using this target helper.
     public String owner;
@@ -228,8 +238,10 @@ public class TargetHelper
 
     // Returns true if the player can be damaged.
     public boolean canDamagePlayer(String username) {
-        if (TargetHelper.HOSTILE)
+        if (TargetHelper.hostile)
             return true;
+        else if (TargetHelper.passiveToPlayers)
+            return false;
         else if (!this.permissions.containsKey(username))
             return !this.isBlacklisted(EntityPlayer.class) && this.isWhitelisted(EntityPlayer.class);
         else
@@ -245,7 +257,9 @@ public class TargetHelper
 
     // Returns true if the player has the given permissions (at least).
     public boolean playerHasPermission(String username, int value) {
-        return this.owner == null || (this.getPermissions(username) & value) == value;
+        // general.public_use drops the ownership gate entirely, for servers that want vanilla-style golems
+        // anyone can walk up to and use rather than the permission-book system (issue #16).
+        return TargetHelper.publicUse || this.owner == null || (this.getPermissions(username) & value) == value;
     }
 
     // Returns true if the given entity should continue to be attacked.

@@ -22,7 +22,7 @@
         "mapping": {
           "P": "minecraft:pumpkin[facing=north]",
           "F": "minecraft:fence",
-          "W": "minecraft:wool",
+          "W": "minecraft:hay_block",
           "0": "minecraft:fence"
         }
       },

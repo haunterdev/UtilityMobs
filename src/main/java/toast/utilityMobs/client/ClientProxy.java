@@ -7,6 +7,7 @@ import net.minecraft.client.renderer.block.model.ModelResourceLocation;
 import net.minecraft.entity.Entity;
 import net.minecraft.item.ItemRecord;
 import net.minecraft.util.ResourceLocation;
+import net.minecraft.world.World;
 import net.minecraftforge.client.model.ModelLoader;
 import net.minecraft.util.SoundEvent;
 import net.minecraftforge.fml.client.FMLClientHandler;
@@ -15,11 +16,14 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import toast.utilityMobs.CommonProxy;
 import toast.utilityMobs.EntityGolemFishHook;
+import toast.utilityMobs.UMSound;
 import toast.utilityMobs._UtilityMobs;
+import toast.utilityMobs.network.MessageExplosion;
 import toast.utilityMobs.block.EntityAnvilGolem;
 import toast.utilityMobs.block.EntityBlockGolem;
 import toast.utilityMobs.block.EntityChestGolem;
 import toast.utilityMobs.block.EntityJukeboxGolem;
+import toast.utilityMobs.client.model.ModelGolemPlayer;
 import toast.utilityMobs.client.model.ModelSkeletonGolem;
 import toast.utilityMobs.client.renderer.RenderAnvilGolem;
 import toast.utilityMobs.client.renderer.RenderBlockGolem;
@@ -31,6 +35,7 @@ import toast.utilityMobs.client.renderer.RenderLargeGolem;
 import toast.utilityMobs.client.renderer.RenderStackGolem;
 import toast.utilityMobs.client.renderer.RenderTurret;
 import toast.utilityMobs.colossal.EntityColossalGolem;
+import toast.utilityMobs.golem.EntityBoundSoul;
 import toast.utilityMobs.golem.EntityLargeGolem;
 import toast.utilityMobs.golem.EntityScarecrow;
 import toast.utilityMobs.golem.EntityStackGolem;
@@ -56,26 +61,15 @@ public class ClientProxy extends CommonProxy
     @Override
     public void registerRenderers() {
         LangFix.install();
-        // Custom Patchouli page type for build guides - adds offset/scale knobs the stock
-        // "multiblock" page lacks. The pageTypes map only ever gains the built-in defaults, so
-        // inserting here (regardless of order vs Patchouli's own init) is safe.
-        vazkii.patchouli.client.book.ClientBookRegistry.INSTANCE.pageTypes.put(
-                "utilitymobs:build_guide", PageBuildGuide.class);
-        vazkii.patchouli.client.book.ClientBookRegistry.INSTANCE.pageTypes.put(
-                "utilitymobs:entity_carousel", PageEntityCarousel.class);
-        // Adds the $(lc:category) book-text link so entries can point at a whole category grid.
-        UMPatchouliLinks.register();
-        // Fit all 12 turret entries on the category landing page (Patchouli caps it at 11, spilling
-        // the Killer turret onto a second page). Swaps the stock GUI for our 12-entry variant.
-        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(
-                new vazkii.patchouli.client.book.gui.GuiTurretCategory.OpenHandler());
+        // Patchouli is a soft dependency (issue #1.6). Everything that touches it lives in
+        // PatchouliClientHooks, which is only loaded when Patchouli is actually present - several of those
+        // types extend Patchouli classes, so naming them from here would fail without it.
+        if (toast.utilityMobs.PatchouliCompat.isLoaded()) {
+            PatchouliClientHooks.install();
+        }
         // Cursor-capable editor for target-list books (vanilla book GUI can't move the cursor).
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(new GuiTargetBookEditor.OpenHandler());
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(new TurretOutlineRenderer());
-        // Dismiss Patchouli's projected multiblock ghost once the golem actually spawns (our builds
-        // become an entity the instant they complete, so Patchouli's own "all blocks present" clear
-        // never fires). See MultiblockBuildClearHandler.
-        net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(new MultiblockBuildClearHandler());
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(new HealTextRenderer());
         // Draws the turret GUI's "?" help tooltip after JEI's overlay so it isn't hidden behind JEI items.
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(new GuiTurretGolem.HelpTooltipHandler());
@@ -87,6 +81,8 @@ public class ClientProxy extends CommonProxy
         RenderingRegistry.registerEntityRenderingHandler(EntityLargeGolem.class, RenderLargeGolem::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityStackGolem.class, RenderStackGolem::new);
         RenderingRegistry.registerEntityRenderingHandler(EntityScarecrow.class, manager -> new RenderGolem(manager, new ModelSkeletonGolem()));
+        // Bound souls use the player model so resource packs get the second (overlay) texture layer (#15).
+        RenderingRegistry.registerEntityRenderingHandler(EntityBoundSoul.class, manager -> new RenderGolem(manager, new ModelGolemPlayer()));
         RenderingRegistry.registerEntityRenderingHandler(EntityStoneGolem.class, manager -> new RenderGolem(manager, new ModelZombie(0.0F, true)));
 
         RenderingRegistry.registerEntityRenderingHandler(EntityTurretGolem.class, RenderTurret::new);
@@ -139,6 +135,70 @@ public class ClientProxy extends CommonProxy
         HealTextRenderer.add(entity, amount);
     }
 
+    // Client half of the heal-number packet. The handler itself stays client-class-free so the packet
+    // can also be registered (and encoded) on a dedicated server. See issue #10.
+    @Override
+    public void handleHealNumber(final int entityId, final float amount) {
+        Minecraft.getMinecraft().addScheduledTask(new Runnable() {
+            @Override
+            public void run() {
+                World world = FMLClientHandler.instance().getWorldClient();
+                if (world == null) {
+                    return;
+                }
+                Entity entity = world.getEntityByID(entityId);
+                if (entity != null) {
+                    ClientProxy.this.spawnHealNumber(entity, amount);
+                }
+            }
+        });
+    }
+
+    // Client half of the explosion-effect packet. Same reason as above.
+    @Override
+    public void handleExplosionFx(final MessageExplosion message) {
+        Minecraft.getMinecraft().addScheduledTask(new Runnable() {
+            @Override
+            public void run() {
+                ClientProxy.playExplosionFx(message);
+            }
+        });
+    }
+
+    private static void playExplosionFx(MessageExplosion message) {
+        World world = FMLClientHandler.instance().getWorldClient();
+        if (world == null)
+            return;
+        if (message.type == MessageExplosion.ExplosionType.NORMAL && message.size >= 2.0F) {
+            world.spawnParticle(UMSound.HUGE_EXPLOSION, message.posX, message.posY, message.posZ, 1.0, 0.0, 0.0);
+        }
+        else {
+            world.spawnParticle(UMSound.LARGE_EXPLODE, message.posX, message.posY, message.posZ, 1.0, 0.0, 0.0);
+        }
+
+        if (message.type == MessageExplosion.ExplosionType.NORMAL && message.affectedBlocks != null) {
+            int count = message.affectedBlocks.length;
+            double[] relPos;
+            double fxPosX, fxPosY, fxPosZ;
+            for (int i = 0; i < count; i++) {
+                relPos = new double[3];
+                for (int d = 0; d < 3; d++) {
+                    relPos[d] = message.affectedBlocks[i][d] + world.rand.nextFloat();
+                }
+                fxPosX = relPos[0] + message.posX;
+                fxPosY = relPos[1] + message.posY;
+                fxPosZ = relPos[2] + message.posZ;
+                double velo = Math.sqrt(relPos[0] * relPos[0] + relPos[1] * relPos[1] + relPos[2] * relPos[2]);
+                double mult = 0.5 / (velo / message.size + 0.1) * (world.rand.nextFloat() * world.rand.nextFloat() + 0.3F) / velo;
+                for (int d = 0; d < 3; d++) {
+                    relPos[d] *= mult;
+                }
+                world.spawnParticle(UMSound.EXPLODE, (fxPosX + message.posX) / 2.0, (fxPosY + message.posY) / 2.0, (fxPosZ + message.posZ) / 2.0, relPos[0], relPos[1], relPos[2]);
+                world.spawnParticle(UMSound.SMOKE, fxPosX, fxPosY, fxPosZ, relPos[0], relPos[1], relPos[2]);
+            }
+        }
+    }
+
     // Called at the end of each client tick.
     @Override
     public void handleClientTick() {
@@ -156,9 +216,4 @@ public class ClientProxy extends CommonProxy
         }
     }
 
-    // Returns true if entities are allowed to block movement. Namely, if they can be stood on.
-    @Override
-    public boolean solidEntities() {
-        return FMLClientHandler.instance().getServer() != null;
-    }
 }

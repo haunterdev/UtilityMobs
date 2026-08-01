@@ -28,7 +28,9 @@ public class GuiGenericInventory extends GuiContainer {
     public void initGui() {
         super.initGui();
         // Help button (top-right) - opens the Patchouli guide book. Hidden when general.show_help_button is false.
-        if (toast.utilityMobs.Properties.getBoolean(toast.utilityMobs.Properties.GENERAL, "show_help_button")) {
+        // Also hidden without Patchouli: it is a soft dependency and there is no book to open (#1.6).
+        if (toast.utilityMobs.PatchouliCompat.isLoaded()
+                && toast.utilityMobs.Properties.getBoolean(toast.utilityMobs.Properties.GENERAL, "show_help_button")) {
             this.buttonList.add(new GuiBorderedButton(90, this.guiLeft + this.xSize - 20, this.guiTop + 4, 16, 16, "?"));
         }
     }
@@ -36,7 +38,7 @@ public class GuiGenericInventory extends GuiContainer {
     @Override
     protected void actionPerformed(GuiButton button) throws IOException {
         if (button.id == 90) {
-            vazkii.patchouli.api.PatchouliAPI.instance.openBookGUI(GuideBook.BOOK_RL);
+            toast.utilityMobs.PatchouliCompat.openBookClient(GuideBook.BOOK_RL);
             return;
         }
         super.actionPerformed(button);

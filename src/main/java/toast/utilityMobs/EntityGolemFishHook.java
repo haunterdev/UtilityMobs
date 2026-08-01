@@ -1,11 +1,14 @@
 package toast.utilityMobs;
 
+import io.netty.buffer.ByteBuf;
+
 import java.util.List;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.init.SoundEvents;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.play.server.SPacketEntityVelocity;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -14,9 +17,10 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraftforge.fml.common.registry.IEntityAdditionalSpawnData;
 import toast.utilityMobs.golem.EntityUtilityGolem;
 
-public class EntityGolemFishHook extends Entity
+public class EntityGolemFishHook extends Entity implements IEntityAdditionalSpawnData
 {
     private BlockPos tilePos = new BlockPos(-1, -1, -1);
     private Block inTile;
@@ -56,6 +60,22 @@ public class EntityGolemFishHook extends Entity
 
     @Override
     protected void entityInit() {
+    }
+
+    // The angler is set by the server-side constructor only. The client builds its copy through the no-arg
+    // constructor, so without this it stayed null there - and the null check at the top of onUpdate() then
+    // killed the hook on its very first client tick, which is why a golem's cast had no visible bobber AND
+    // no line (RenderGolemFishHook draws the line only when angler != null).
+    @Override
+    public void writeSpawnData(ByteBuf buffer) {
+        buffer.writeInt(this.angler == null ? -1 : this.angler.getEntityId());
+    }
+
+    @Override
+    public void readSpawnData(ByteBuf buffer) {
+        int anglerId = buffer.readInt();
+        Entity entity = anglerId < 0 ? null : this.world.getEntityByID(anglerId);
+        this.angler = entity instanceof EntityUtilityGolem ? (EntityUtilityGolem)entity : null;
     }
 
     @Override
@@ -102,7 +122,10 @@ public class EntityGolemFishHook extends Entity
         this.lastTickPosY = this.posY;
         this.lastTickPosZ = this.posZ;
         super.onUpdate();
-        if (this.angler == null || this.angler.isDead || this.getDistanceSq(this.angler) > 1024.0) {
+        // Server-side only. The client mirrors the removal through the despawn packet; letting it decide for
+        // itself meant one dropped/late spawn-data read removed the hook client-side while the server still
+        // had it in flight.
+        if (!this.world.isRemote && (this.angler == null || this.angler.isDead || this.getDistanceSq(this.angler) > 1024.0)) {
             this.setDead();
         }
         if (this.shake > 0) {
@@ -190,7 +213,10 @@ public class EntityGolemFishHook extends Entity
     }
 
     public void onImpact(RayTraceResult object) {
-        if (object.entityHit != null) {
+        if (object.entityHit != null && this.angler != null) {
+            // Reeling something in makes the bobber-retrieve sound, matching a player's fishing rod and
+            // SpecialMobs' fishing zombie. There was no sound at all on a hit before (issue #1.10 / #11).
+            this.playSound(SoundEvents.ENTITY_BOBBER_RETRIEVE, 0.5F, 0.4F / (this.rand.nextFloat() * 0.4F + 0.8F));
             double vX = this.angler.posX - this.posX;
             double vY = this.angler.posY - this.posY;
             double vZ = this.angler.posZ - this.posZ;

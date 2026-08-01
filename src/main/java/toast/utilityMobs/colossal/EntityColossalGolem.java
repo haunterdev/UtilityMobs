@@ -5,6 +5,8 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 import net.minecraft.block.Block;
+import net.minecraft.block.material.Material;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.IEntityOwnable;
@@ -20,6 +22,7 @@ import net.minecraft.network.datasync.DataSerializers;
 import net.minecraft.network.datasync.EntityDataManager;
 import net.minecraft.network.play.server.SPacketEntityVelocity;
 import net.minecraft.util.DamageSource;
+import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.AxisAlignedBB;
@@ -28,7 +31,6 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import toast.utilityMobs.UMSound;
-import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.ai.EntityAIGolemTarget;
 import toast.utilityMobs.golem.EntityUtilityGolem;
 
@@ -37,12 +39,19 @@ public class EntityColossalGolem extends EntityUtilityGolem
     public static final int ANIM_R_ARM_SWING = 1;
     public static final int ANIM_L_ARM_SWING = 2;
     public static boolean wanderWhileRidden = false;
+    /// Whether colossi are solid (standable). Config-driven (colossals.collision) so the server and every
+    /// client agree. This used to be proxy.solidEntities(), which answered "is there an integrated server":
+    /// true on a LAN host, false for everyone who joined it, so a guest's client thought the colossus was
+    /// pass-through while the server thought it was solid, and the rider rubber-banded (issue #18).
+    public static boolean collision = true;
 
     /// animId; The animation currently being played. 0 is no animation.
     private static final DataParameter<Byte> ANIM_ID = EntityDataManager.createKey(EntityColossalGolem.class, DataSerializers.BYTE);
 
     private int lastAnimId;
     private int animTick;
+    /// A rider that left this tick, waiting to be placed on solid ground next tick. Not saved.
+    private Entity pendingDismount;
 
     public EntityColossalGolem(World world) {
         super(world);
@@ -103,7 +112,7 @@ public class EntityColossalGolem extends EntityUtilityGolem
     @Nullable
     @Override
     public AxisAlignedBB getCollisionBoundingBox() {
-        return _UtilityMobs.proxy.solidEntities() ? this.getEntityBoundingBox() : super.getCollisionBoundingBox();
+        return EntityColossalGolem.collision ? this.getEntityBoundingBox() : super.getCollisionBoundingBox();
     }
 
     // Returns if this entity is in water and will end up adding the waters velocity to the entity.
@@ -122,9 +131,69 @@ public class EntityColossalGolem extends EntityUtilityGolem
         this.getEntityAttribute(SharedMonsterAttributes.KNOCKBACK_RESISTANCE).setBaseValue(1.0);
     }
 
+    // Vanilla's dismount placement is wrong for something this tall, so redo it a tick later.
+    // EntityLivingBase.dismountRidingEntity() calls removePassenger() FIRST and dismountEntity()
+    // afterwards, so relocating inside removePassenger would just be overwritten. See #18.
+    @Override
+    protected void removePassenger(Entity passenger) {
+        super.removePassenger(passenger);
+        if (!this.world.isRemote && passenger instanceof EntityLivingBase) {
+            this.pendingDismount = passenger;
+        }
+    }
+
+    /// Puts a just-dismounted rider on solid ground beside the colossus.
+    ///
+    /// EntityLivingBase.dismountEntity() probes for a landing spot using the RIDER's current posY, which
+    /// while mounted is getMountedYOffset() (= 3.2) blocks in the air. Every probe therefore samples air,
+    /// no branch matches, and it falls through to its default of (mount posX, mount bbox minY + mount
+    /// height, mount posZ): the top of the colossus's head, dead centre. The rider ends up standing on
+    /// the golem, which then walks off under them. That is issue #18.
+    private void relocateDismountedRider(Entity rider) {
+        double baseY = this.getEntityBoundingBox().minY;
+        double ring = this.width / 2.0 + rider.width / 2.0 + 0.35;
+        // Sweep the full circle starting behind the colossus, so the rider steps off its back.
+        for (int step = 0; step < 8; step++) {
+            double angle = Math.toRadians(this.renderYawOffset + 180.0F + step * 45.0);
+            double x = this.posX - Math.sin(angle) * ring;
+            double z = this.posZ + Math.cos(angle) * ring;
+            // Prefer a spot level with the colossus's feet, then look down for the ground below it.
+            for (int dy = 1; dy >= -4; dy--) {
+                double y = baseY + dy;
+                if (this.isSafeDismountSpot(rider, x, y, z)) {
+                    rider.setPositionAndUpdate(x, y, z);
+                    rider.motionX = rider.motionY = rider.motionZ = 0.0;
+                    rider.fallDistance = 0.0F;
+                    return;
+                }
+            }
+        }
+        // Boxed in on every side: leave vanilla's placement alone rather than teleport into a wall.
+    }
+
+    private boolean isSafeDismountSpot(Entity rider, double x, double y, double z) {
+        double halfWidth = rider.width / 2.0;
+        AxisAlignedBB box = new AxisAlignedBB(x - halfWidth, y, z - halfWidth, x + halfWidth, y + rider.height, z + halfWidth);
+        if (this.world.collidesWithAnyBlock(box))
+            return false;
+        // Never land inside our own collision box - that is the "stuck, can't move" half of the bug.
+        if (EntityColossalGolem.collision && box.intersects(this.getEntityBoundingBox()))
+            return false;
+        BlockPos below = new BlockPos(x, y - 0.2, z);
+        IBlockState state = this.world.getBlockState(below);
+        return state.isSideSolid(this.world, below, EnumFacing.UP) || state.getMaterial() == Material.WATER;
+    }
+
     @Override
     public void onUpdate() {
         super.onUpdate();
+        if (!this.world.isRemote && this.pendingDismount != null) {
+            Entity rider = this.pendingDismount;
+            this.pendingDismount = null;
+            if (!rider.isDead && rider.world == this.world && rider.getRidingEntity() == null) {
+                this.relocateDismountedRider(rider);
+            }
+        }
         int animId = this.getAnimId();
         if (this.lastAnimId != animId) {
             this.lastAnimId = animId;
@@ -219,8 +288,9 @@ public class EntityColossalGolem extends EntityUtilityGolem
 
     @Override
     public boolean processInteract(EntityPlayer player, EnumHand hand) {
-        // Only the owner may mount a colossus.
-        if (this.canInteract(player) && !player.isSneaking() && this.getOwnerName().equals(player.getName())) {
+        // Only the owner may mount a colossus, unless general.public_use opens golems up to everyone (#16).
+        if (this.canInteract(player) && !player.isSneaking()
+                && (toast.utilityMobs.TargetHelper.publicUse || this.getOwnerName().equals(player.getName()))) {
             if (!player.onGround) {
                 if (!this.isBeingRidden()) {
                     player.startRiding(this);

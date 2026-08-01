@@ -156,10 +156,25 @@ public abstract class EntityUtilityGolem extends EntityGolem implements IEntityO
             super.playHurtSound(source);
             return;
         }
-        // Block-typed golem: a hit chips the block. Play the BREAK sound at reduced volume and a slightly
-        // higher pitch so it clearly reads as "block breaking" (Grande's request) yet stays distinct from
-        // the full-volume death break.
-        this.playSound(type.getBreakSound(), type.getVolume() * 0.7F, type.getPitch() * 1.2F);
+        // Block-typed golem: a hit chips the block. Play the BREAK sound quieter than the death break, but
+        // at nearly the same pitch. It used to be pitched UP (x1.2) against vanilla's x0.8, which is why
+        // e.g. the bound soul's sand break sounded shrill next to a real sand block (issue #11).
+        this.playSound(type.getBreakSound(), type.getVolume() * 0.7F, type.getPitch() * 0.9F);
+    }
+
+    /// Vanilla plays a block's break sound at (volume + 1) / 2 and pitch * 0.8 (see Block.harvestBlock).
+    /// Death runs through EntityLivingBase.onDeath, which uses these two, so matching them here is what
+    /// makes a golem's death actually sound like that block breaking (issue #11).
+    @Override
+    protected float getSoundVolume() {
+        SoundType type = this.getGolemSoundType();
+        return type == null ? super.getSoundVolume() : (type.getVolume() + 1.0F) / 2.0F;
+    }
+
+    @Override
+    protected float getSoundPitch() {
+        SoundType type = this.getGolemSoundType();
+        return type == null ? super.getSoundPitch() : type.getPitch() * 0.8F;
     }
 
     @Override
@@ -222,8 +237,15 @@ public abstract class EntityUtilityGolem extends EntityGolem implements IEntityO
         float attackDamage = (float)this.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE).getAttributeValue();
         if (this.isWeaponDamageOnly() && !weapon.isEmpty()) {
             // Weapon golems deal only the equipped weapon's own damage, not their innate base on top of it.
-            attackDamage -= (float)this.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE).getBaseValue();
-            attackDamage = Math.max(0.0F, attackDamage);
+            // Only items that carry an ATTACK_DAMAGE modifier raise the attribute above its base
+            // (EntityLivingBase.onUpdate applies a held stack's modifiers to mobs too), so a golem holding
+            // something that is not a melee weapon - fishing rod, bow, torch - used to come out of this at
+            // exactly 0.0 and swing for literally nothing. Let the weapon REPLACE the innate damage only
+            // when it actually supplies some; otherwise the golem keeps its own.
+            float weaponDamage = attackDamage - (float)this.getEntityAttribute(SharedMonsterAttributes.ATTACK_DAMAGE).getBaseValue();
+            if (weaponDamage > 0.0F) {
+                attackDamage = weaponDamage;
+            }
         }
         int knockback = 0;
         if (entity instanceof EntityLivingBase) {
@@ -406,11 +428,20 @@ public abstract class EntityUtilityGolem extends EntityGolem implements IEntityO
         if (itemStack == null) {
             itemStack = ItemStack.EMPTY;
         }
-        if (!this.world.isRemote && !this.getEquipmentInSlot(slot).isEmpty()) {
-            this.entityDropItem(this.getEquipmentInSlot(slot), 0.0F);
+        ItemStack previous = this.getEquipmentInSlot(slot);
+        if (!this.world.isRemote && !previous.isEmpty()) {
+            this.entityDropItem(previous, 0.0F);
         }
         this.setCurrentItemOrArmor(slot, itemStack);
         this.setEquipDropChance(slot, 2.0F);
+        // Equipping sound, matching what a player hears putting the same item on themselves. Requested on
+        // issue #11 for the bound soul and scarecrow; it applies to every golem that takes equipment.
+        // EntityLivingBase.playEquipSound already picks the armour material's own sound (so modded armour
+        // is covered) and falls back to the generic one, but only players ever called it.
+        // Server-side only: playSound broadcasts from there, and calling it on both sides doubles it.
+        if (!this.world.isRemote) {
+            this.playEquipSound(itemStack.isEmpty() ? previous : itemStack);
+        }
         return true;
     }
 

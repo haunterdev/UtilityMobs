@@ -1,10 +1,7 @@
 package toast.utilityMobs.network;
 
 import io.netty.buffer.ByteBuf;
-import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.client.FMLClientHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
@@ -47,19 +44,9 @@ public class MessageHealNumber implements IMessage {
     public static class Handler implements IMessageHandler<MessageHealNumber, IMessage> {
         @Override
         public IMessage onMessage(final MessageHealNumber message, MessageContext ctx) {
-            Minecraft.getMinecraft().addScheduledTask(new Runnable() {
-                @Override
-                public void run() {
-                    World world = FMLClientHandler.instance().getWorldClient();
-                    if (world == null) {
-                        return;
-                    }
-                    Entity entity = world.getEntityByID(message.entityId);
-                    if (entity != null) {
-                        _UtilityMobs.proxy.spawnHealNumber(entity, message.amount);
-                    }
-                }
-            });
+            // Straight to the proxy: this class is also loaded on a dedicated server (so the server can
+            // encode the packet), so it must not name a client-only type. See issue #10.
+            _UtilityMobs.proxy.handleHealNumber(message.entityId, message.amount);
             return null;
         }
     }

@@ -42,13 +42,13 @@ import net.minecraftforge.fml.common.network.simpleimpl.SimpleNetworkWrapper;
 import net.minecraftforge.fml.common.registry.EntityRegistry;
 import net.minecraftforge.fml.relauncher.Side;
 
-@Mod(modid = _UtilityMobs.MODID, name = "Utility Mobs", version = _UtilityMobs.VERSION, guiFactory = "toast.utilityMobs.client.GuiFactory", dependencies = "required-after:patchouli")
+@Mod(modid = _UtilityMobs.MODID, name = "Utility Mobs", version = _UtilityMobs.VERSION, guiFactory = "toast.utilityMobs.client.GuiFactory", dependencies = "after:patchouli")
 public class _UtilityMobs
 {
     // This mod's id (lowercased for 1.12.2 - registry/resource domains must be lowercase).
     public static final String MODID = "utilitymobs";
     // This mod's version.
-    public static final String VERSION = "3.2.0";
+    public static final String VERSION = "3.4.0";
 
     // If true, this mod starts up in debug mode.
     public static final boolean debug = false;
@@ -190,7 +190,12 @@ public class _UtilityMobs
             IForgeRegistry<IRecipe> registry = event.getRegistry();
             Item book = Properties.getBoolean(Properties.GENERAL, "alternate_manuals") ? Items.WRITABLE_BOOK : Items.BOOK;
             // The mod's content is documented in a Patchouli guide book - vanilla book + pumpkin.
-            shapeless(registry, "guide_book", GuideBook.stack(), Items.BOOK, new ItemStack(Blocks.PUMPKIN));
+            // Patchouli is a soft dependency, so skip the recipe entirely when it is absent (issue #1.6);
+            // GuideBook.stack() is empty then, and a recipe with an empty output is not registerable.
+            ItemStack guideBook = GuideBook.stack();
+            if (!guideBook.isEmpty()) {
+                shapeless(registry, "guide_book", guideBook, Items.BOOK, new ItemStack(Blocks.PUMPKIN));
+            }
             shapeless(registry, "target_book_0", TargetHelper.book(0), book, new ItemStack(Items.BONE));
             shapeless(registry, "target_book_1", TargetHelper.book(1), book, new ItemStack(Items.ROTTEN_FLESH));
 
@@ -232,16 +237,19 @@ public class _UtilityMobs
         TargetHelper.SAVE_DIRECTORY = new File(event.getModConfigurationDirectory(), "UtilityMobs");
 
         _UtilityMobs.CHANNEL = NetworkRegistry.INSTANCE.newSimpleChannel("UM|Info");
-        int id = 0;
-        _UtilityMobs.CHANNEL.registerMessage(MessageUseGolem.Handler.class, MessageUseGolem.class, id++, Side.SERVER);
-        _UtilityMobs.CHANNEL.registerMessage(MessageTargetHelper.Handler.class, MessageTargetHelper.class, id, Side.SERVER);
+        // Every message registers on BOTH physical sides with the SAME discriminator. A dedicated
+        // server needs the client-bound ones in its table to encode them at all - registering them
+        // only on the client made sendTo/sendToDimension/sendToAllAround throw server-side (issue #10,
+        // heal numbers, explosion effects and target-list sync). No handler below touches a
+        // client-only class directly; client work is routed through _UtilityMobs.proxy, so
+        // instantiating the handlers on a dedicated server is safe.
+        _UtilityMobs.CHANNEL.registerMessage(MessageUseGolem.Handler.class, MessageUseGolem.class, 0, Side.SERVER);
+        _UtilityMobs.CHANNEL.registerMessage(MessageTargetHelper.Handler.class, MessageTargetHelper.class, 1, Side.SERVER);
         _UtilityMobs.CHANNEL.registerMessage(MessageTurretToggle.Handler.class, MessageTurretToggle.class, 4, Side.SERVER);
-        if (event.getSide() == Side.CLIENT) {
-            _UtilityMobs.CHANNEL.registerMessage(MessageTargetHelper.Handler.class, MessageTargetHelper.class, id++, Side.CLIENT);
-            _UtilityMobs.CHANNEL.registerMessage(MessageFetchTargetHelper.Handler.class, MessageFetchTargetHelper.class, id++, Side.CLIENT);
-            _UtilityMobs.CHANNEL.registerMessage(MessageExplosion.Handler.class, MessageExplosion.class, id++, Side.CLIENT);
-            _UtilityMobs.CHANNEL.registerMessage(MessageHealNumber.Handler.class, MessageHealNumber.class, 5, Side.CLIENT);
-        }
+        _UtilityMobs.CHANNEL.registerMessage(MessageTargetHelper.Handler.class, MessageTargetHelper.class, 1, Side.CLIENT);
+        _UtilityMobs.CHANNEL.registerMessage(MessageFetchTargetHelper.Handler.class, MessageFetchTargetHelper.class, 2, Side.CLIENT);
+        _UtilityMobs.CHANNEL.registerMessage(MessageExplosion.Handler.class, MessageExplosion.class, 3, Side.CLIENT);
+        _UtilityMobs.CHANNEL.registerMessage(MessageHealNumber.Handler.class, MessageHealNumber.class, 5, Side.CLIENT);
         // Entity renderers MUST register in preInit: RenderManager runs loadEntityRenderers at the end of
         // its constructor, which happens after preInit but before init. Registering in init is too late
         // (factories never apply, entities fall back to RenderEntity = white box).

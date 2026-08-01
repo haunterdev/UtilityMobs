@@ -42,6 +42,12 @@ public class EntityMelonGolem extends EntityStackGolem
         return SoundType.WOOD;
     }
 
+    // No footsteps, matching the vanilla snow golem it is modelled on (issue #11). The melon-wood step
+    // sound was loud and constant for something this small.
+    @Override
+    protected void playStepSound(BlockPos pos, net.minecraft.block.Block block) {
+    }
+
 
     public EntityMelonGolem(World world) {
         super(world);
@@ -51,7 +57,12 @@ public class EntityMelonGolem extends EntityStackGolem
         this.setEquipDropChance(4, 0.0F);
         this.tasks.addTask(1, this.sitAI);
         this.sitAI.setMutexBits(7);
-        this.followAI = new EntityAIFollowEntity(this, EntityGolem.class, 1.0, 4.0F, 32.0F);
+        // Never escort another melon golem: two of them would lock onto each other and sit there instead of
+        // going to the golems that actually need healing (issue #1.9 / #14). Hurt golems outrank healthy
+        // ones so a healer walks to whoever is damaged rather than to whoever happens to be nearest.
+        this.followAI = new EntityAIFollowEntity(this, EntityGolem.class, 1.0, 4.0F, 32.0F)
+                .setFilter(candidate -> !(candidate instanceof EntityMelonGolem))
+                .setPreferInjured(true);
         this.tasks.addTask(2, this.followAI);
         this.tasks.addTask(3, new toast.utilityMobs.ai.EntityAIGolemWander(this, 1.0));
         this.tasks.addTask(4, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));

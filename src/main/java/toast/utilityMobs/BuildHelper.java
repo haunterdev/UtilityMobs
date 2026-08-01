@@ -239,7 +239,7 @@ public class BuildHelper
             BuildHelper.particleEffect(world, "snowballpoof", x, y, z);
             return true;
         }
-        else if (Properties.getBoolean("build.golems", "Scarecrow") && top == Blocks.WOOL && BuildHelper.isFenceWood(bottom)) {
+        else if (Properties.getBoolean("build.golems", "Scarecrow") && top == Blocks.HAY_BLOCK && BuildHelper.isFenceWood(bottom)) {
             boolean xAxis = BuildHelper.isFenceWood(armLX) && BuildHelper.isFenceWood(armRX);
             boolean zAxis = BuildHelper.isFenceWood(armLZ) && BuildHelper.isFenceWood(armRZ);
             if (xAxis || zAxis) {

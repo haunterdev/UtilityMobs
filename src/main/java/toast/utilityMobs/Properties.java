@@ -6,6 +6,8 @@ import java.util.Random;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 import net.minecraftforge.fml.client.config.GuiConfigEntries;
+import net.minecraftforge.fml.common.FMLCommonHandler;
+import net.minecraftforge.fml.relauncher.Side;
 
 /**
     This helper class automatically creates, stores, and retrieves properties.
@@ -49,6 +51,10 @@ public abstract class Properties
         prop.setLanguageKey("utilitymobs.cfg.general.show_help_button");
         prop = Properties.add(config, Properties.GENERAL, "creeper_head_rarity", 80, "The rarity for a creeper to drop its head when killed. Setting this to 0 disables skull drops. Drop chance is 1/(rarity - looting).");
         prop.setLanguageKey("utilitymobs.cfg.general.creeper_head_rarity").setMinValue(0);
+        prop = Properties.add(config, Properties.GENERAL, "public_use", false, "If true, ANY player may use and open any golem (GUIs, sitting, equipping), not just its owner and the players its owner granted permission to. The permission books still work; this simply stops them being required.");
+        prop.setLanguageKey("utilitymobs.cfg.general.public_use");
+        prop = Properties.add(config, Properties.GENERAL, "passive_to_players", false, "If true, no golem ever targets a player, whoever owns it. Use with public_use for plain vanilla-style golems that ignore the permission system. Overridden by 'hostile'.");
+        prop.setLanguageKey("utilitymobs.cfg.general.passive_to_players");
         prop = Properties.add(config, Properties.GENERAL, "hostile", false, "If this is true, all utility mobs added by this mod will be hostile towards players.");
         prop.setLanguageKey("utilitymobs.cfg.general.hostile").setRequiresWorldRestart(true);
         prop = Properties.add(config, Properties.GENERAL, "wither_conversion", true, "Setting this to false disables the wither skull to skeleton skull recipe.");
@@ -76,7 +82,8 @@ public abstract class Properties
         prop = Properties.add(config, "turrets", "no_mob_aggro", false, "If true, hostile mobs will never target or retaliate against turrets (worker golems are unaffected).");
         prop.setLanguageKey("utilitymobs.cfg.turrets.no_mob_aggro");
         prop = Properties.add(config, "turrets", "drop_chance", 0.5, "Chance (0.0-1.0) that a turret drops its building block when killed. 1.0 = always, 0.5 = coin flip, 0.0 = never. Does not affect ammo drops.");
-        prop.setLanguageKey("utilitymobs.cfg.turrets.drop_chance").setMinValue(0.0).setMaxValue(1.0).setConfigEntryClass(GuiConfigEntries.NumberSliderEntry.class);
+        prop.setLanguageKey("utilitymobs.cfg.turrets.drop_chance").setMinValue(0.0).setMaxValue(1.0);
+        Properties.slider(prop);
         prop = Properties.add(config, "turrets", "collision", false, "If true, turrets become solid and can be stood on and walked across (like colossal golems) - place a row of turrets to build a turret walkway. Off by default; turrets are pass-through.");
         prop.setLanguageKey("utilitymobs.cfg.turrets.collision");
 
@@ -96,21 +103,29 @@ public abstract class Properties
         prop = Properties.add(config, "golems", "performance_logging", false, "If true, logs golem AI and collision timing stats to the server console every 10s. Diagnostic only - leave off in normal play.");
         prop.setLanguageKey("utilitymobs.cfg.golems.performance_logging");
         prop = Properties.add(config, "golems", "target_scan_interval", 10, "Ticks between target searches for a golem with no target. Higher = much better TPS with many golems, at a small delay to acquire new targets. 1 = vanilla (scan every tick).");
-        prop.setLanguageKey("utilitymobs.cfg.golems.target_scan_interval").setMinValue(1).setMaxValue(200).setConfigEntryClass(GuiConfigEntries.NumberSliderEntry.class);
+        prop.setLanguageKey("utilitymobs.cfg.golems.target_scan_interval").setMinValue(1).setMaxValue(200);
+        Properties.slider(prop);
         prop = Properties.add(config, "golems", "target_raytrace_cap", 5, "Max line-of-sight raytraces a golem does per target search. Caps the most expensive part of targeting. Lower = cheaper, may miss a visible target behind closer blocked ones.");
-        prop.setLanguageKey("utilitymobs.cfg.golems.target_raytrace_cap").setMinValue(1).setMaxValue(50).setConfigEntryClass(GuiConfigEntries.NumberSliderEntry.class);
+        prop.setLanguageKey("utilitymobs.cfg.golems.target_raytrace_cap").setMinValue(1).setMaxValue(50);
+        Properties.slider(prop);
         prop = Properties.add(config, "golems", "collision_push_cap", 8, "Max entities a golem pushes per tick. Caps the O(n^2) shove cost when golems clump. 0 = unlimited (scan still profiled), -1 = pure vanilla (no override).");
-        prop.setLanguageKey("utilitymobs.cfg.golems.collision_push_cap").setMinValue(-1).setMaxValue(64).setConfigEntryClass(GuiConfigEntries.NumberSliderEntry.class);
+        prop.setLanguageKey("utilitymobs.cfg.golems.collision_push_cap").setMinValue(-1).setMaxValue(64);
+        Properties.slider(prop);
         prop = Properties.add(config, "golems", "collision_disable_density", 0, "If a golem is crowded by at least this many entities, it stops colliding entirely (no scan, no push) until the crowd thins - it just stacks instead of bouncing. The mob-bumping cost is O(n^2) in a pile, so this is the big win for huge armies. 0 = never disable. Try ~24 for dense armies.");
-        prop.setLanguageKey("utilitymobs.cfg.golems.collision_disable_density").setMinValue(0).setMaxValue(128).setConfigEntryClass(GuiConfigEntries.NumberSliderEntry.class);
+        prop.setLanguageKey("utilitymobs.cfg.golems.collision_disable_density").setMinValue(0).setMaxValue(128);
+        Properties.slider(prop);
         prop = Properties.add(config, "golems", "collision_interval", 1, "Run a golem's collision check only every N ticks (staggered across golems). The collision scan is the single most expensive thing at high golem counts; 3-4 is visually fine and cuts that cost N-fold. 1 = every tick (vanilla cadence). Mounted golems skip collision entirely regardless.");
-        prop.setLanguageKey("utilitymobs.cfg.golems.collision_interval").setMinValue(1).setMaxValue(20).setConfigEntryClass(GuiConfigEntries.NumberSliderEntry.class);
+        prop.setLanguageKey("utilitymobs.cfg.golems.collision_interval").setMinValue(1).setMaxValue(20);
+        Properties.slider(prop);
         prop = Properties.add(config, "golems", "active_range", 64, "A golem with no player within this many blocks skips its expensive scans (targeting AND collision) until a player approaches. This is the main lever for supporting very large armies - far-off golems cost almost nothing. 0 = always active (no gating).");
-        prop.setLanguageKey("utilitymobs.cfg.golems.active_range").setMinValue(0).setMaxValue(256).setConfigEntryClass(GuiConfigEntries.NumberSliderEntry.class);
+        prop.setLanguageKey("utilitymobs.cfg.golems.active_range").setMinValue(0).setMaxValue(256);
+        Properties.slider(prop);
         prop = Properties.add(config, "golems", "follow_teleports_per_tick", 20, "Max golems that may teleport to their owner per tick. Prevents the lag spike when a large following army all teleports at once after the owner moves far. Lower = smoother but the army regroups slower.");
-        prop.setLanguageKey("utilitymobs.cfg.golems.follow_teleports_per_tick").setMinValue(1).setMaxValue(200).setConfigEntryClass(GuiConfigEntries.NumberSliderEntry.class);
+        prop.setLanguageKey("utilitymobs.cfg.golems.follow_teleports_per_tick").setMinValue(1).setMaxValue(200);
+        Properties.slider(prop);
         prop = Properties.add(config, "golems", "wander_budget", 40, "Max golems that may begin a roam (wander pathfind) per tick across the whole world. Keeps a big roaming army cheap; the rest simply wait their turn. Roaming also only happens near a player (see active_range).");
-        prop.setLanguageKey("utilitymobs.cfg.golems.wander_budget").setMinValue(1).setMaxValue(200).setConfigEntryClass(GuiConfigEntries.NumberSliderEntry.class);
+        prop.setLanguageKey("utilitymobs.cfg.golems.wander_budget").setMinValue(1).setMaxValue(200);
+        Properties.slider(prop);
 
         // ---- Colossals (behavior) ----
         prop = Properties.add(config, "colossals", "attack_hostiles", true, "If true, colossal golems may target hostile mobs.");
@@ -121,6 +136,8 @@ public abstract class Properties
         prop.setLanguageKey("utilitymobs.cfg.colossals.attack_neutrals");
         prop = Properties.add(config, "colossals", "wander_while_ridden", false, "If true, a ridden colossus keeps its normal wandering AI while the rider is idle. Pressing a movement key immediately takes manual control until the rider stops moving.");
         prop.setLanguageKey("utilitymobs.cfg.colossals.wander_while_ridden");
+        prop = Properties.add(config, "colossals", "collision", true, "If true, colossal golems are solid and can be stood on and walked across. Must be set the same on the server and on every client, or riders will rubber-band.");
+        prop.setLanguageKey("utilitymobs.cfg.colossals.collision");
 
         // ---- Build toggles: UM iron/snow golems (explicit) ----
         // These are built by upgrading a vanilla golem (no spawn egg, intentionally not in UTILITY_NAMES).
@@ -178,6 +195,10 @@ public abstract class Properties
         toast.utilityMobs.ai.EntityAIGolemFollow.teleportBudget = Math.max(1, Properties.getInt("golems", "follow_teleports_per_tick"));
         toast.utilityMobs.ai.EntityAIGolemWander.budget = Math.max(1, Properties.getInt("golems", "wander_budget"));
         toast.utilityMobs.colossal.EntityColossalGolem.wanderWhileRidden = Properties.getBoolean("colossals", "wander_while_ridden");
+        toast.utilityMobs.colossal.EntityColossalGolem.collision = Properties.getBoolean("colossals", "collision");
+        toast.utilityMobs.TargetHelper.hostile = Properties.getBoolean(Properties.GENERAL, "hostile");
+        toast.utilityMobs.TargetHelper.publicUse = Properties.getBoolean(Properties.GENERAL, "public_use");
+        toast.utilityMobs.TargetHelper.passiveToPlayers = Properties.getBoolean(Properties.GENERAL, "passive_to_players");
         toast.utilityMobs.golem.EntityMelonGolem.healRange = (float)Properties.getDouble("golems", "melon_heal_range");
     }
 
@@ -194,6 +215,17 @@ public abstract class Properties
     // Passes to the mod.
     public static void debugException(String message) {
         _UtilityMobs.debugException(message);
+    }
+
+    // Applies the NumberSliderEntry widget to a property, but ONLY on the physical client.
+    // net.minecraftforge.fml.client.config.GuiConfigEntries does not exist on a dedicated server,
+    // so referencing its class literal there throws NoClassDefFoundError during preInit (issue #10).
+    // The class constant is only loaded when this ldc actually executes, which the side guard prevents
+    // on the server. The in-game config GUI is client-only anyway, so nothing is lost server-side.
+    static void slider(Property prop) {
+        if (FMLCommonHandler.instance().getSide() == Side.CLIENT) {
+            prop.setConfigEntryClass(GuiConfigEntries.NumberSliderEntry.class);
+        }
     }
 
     // Loads the property as the specified value. Returns the Property for GUI metadata chaining.

@@ -4,7 +4,6 @@ import net.minecraft.entity.MoverType;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.Item;
 import net.minecraft.util.ResourceLocation;
-import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.world.World;
 import toast.utilityMobs._UtilityMobs;
 
@@ -19,12 +18,6 @@ public class EntityChestTrappedGolem extends EntityChestGolem
         this.texture = EntityChestTrappedGolem.TEXTURE;
         this.sitAI.setMutexBits(7);
         this.sitAI.sitAnywhere = true;
-    }
-
-    // Returns the bounding box for this entity. Prevents movement.
-    @Override
-    public AxisAlignedBB getEntityBoundingBox() {
-        return this.isSitting() && _UtilityMobs.proxy.solidEntities() ? super.getEntityBoundingBox() : super.getEntityBoundingBox();
     }
 
     @Override

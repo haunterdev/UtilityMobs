@@ -27,9 +27,10 @@ public class EntityScarecrow extends EntityUtilityGolem
     /// The texture for this class.
     public static final ResourceLocation TEXTURE = new ResourceLocation(_UtilityMobs.TEXTURE + "golem/scarecrow.png");
 
+    // Hay, not wool, since the scarecrow is built from hay blocks now (issue #13).
     @Override
     protected SoundType getGolemSoundType() {
-        return SoundType.CLOTH;
+        return SoundType.PLANT;
     }
 
 
@@ -62,14 +63,13 @@ public class EntityScarecrow extends EntityUtilityGolem
         return data;
     }
 
-    @Override
-    protected boolean canTriggerWalking() {
-        return false;
-    }
+    // NOTE: canTriggerWalking() used to be overridden to false here (a straw dummy makes no noise), which
+    // is why the scarecrow was the one golem with no footsteps at all (issue #11). The base returns true,
+    // so it now plays its hay step sound like every other block-typed golem.
 
     @Override
     protected Item getDropItem() {
-        return Item.getItemFromBlock(Blocks.WOOL);
+        return Item.getItemFromBlock(Blocks.HAY_BLOCK);
     }
 
     @Override

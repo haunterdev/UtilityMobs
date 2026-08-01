@@ -11,7 +11,7 @@
   "credits": "Original 1.7.10 mod by FatherToast; 1.12.2 port.",
   "logoFile": "",
   "screenshots": [],
-  "requiredMods": ["patchouli"],
-  "dependencies": ["patchouli"]
+  "requiredMods": [],
+  "dependencies": []
 }
 ]

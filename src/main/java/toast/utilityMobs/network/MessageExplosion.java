@@ -3,14 +3,11 @@ package toast.utilityMobs.network;
 import java.util.List;
 
 import io.netty.buffer.ByteBuf;
-import net.minecraft.client.Minecraft;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-import net.minecraftforge.fml.client.FMLClientHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
-import toast.utilityMobs.UMSound;
+import toast.utilityMobs._UtilityMobs;
 
 public class MessageExplosion implements IMessage {
 
@@ -127,47 +124,10 @@ public class MessageExplosion implements IMessage {
 
         @Override
         public IMessage onMessage(final MessageExplosion message, MessageContext ctx) {
-            Minecraft.getMinecraft().addScheduledTask(new Runnable() {
-                @Override
-                public void run() {
-                    Handler.this.handle(message);
-                }
-            });
+            // Straight to the proxy: this class is also loaded on a dedicated server (so the server can
+            // encode the packet), so it must not name a client-only type. See issue #10.
+            _UtilityMobs.proxy.handleExplosionFx(message);
             return null;
-        }
-
-        private void handle(MessageExplosion message) {
-            World world = FMLClientHandler.instance().getWorldClient();
-            if (world == null)
-                return;
-            if (message.type == ExplosionType.NORMAL && message.size >= 2.0F) {
-                world.spawnParticle(UMSound.HUGE_EXPLOSION, message.posX, message.posY, message.posZ, 1.0, 0.0, 0.0);
-            }
-            else {
-                world.spawnParticle(UMSound.LARGE_EXPLODE, message.posX, message.posY, message.posZ, 1.0, 0.0, 0.0);
-            }
-
-            if (message.type == ExplosionType.NORMAL && message.affectedBlocks != null) {
-                int count = message.affectedBlocks.length;
-                double[] relPos;
-                double fxPosX, fxPosY, fxPosZ;
-                for (int i = 0; i < count; i++) {
-                    relPos = new double[3];
-                    for (int d = 0; d < 3; d++) {
-                        relPos[d] = message.affectedBlocks[i][d] + world.rand.nextFloat();
-                    }
-                    fxPosX = relPos[0] + message.posX;
-                    fxPosY = relPos[1] + message.posY;
-                    fxPosZ = relPos[2] + message.posZ;
-                    double velo = Math.sqrt(relPos[0] * relPos[0] + relPos[1] * relPos[1] + relPos[2] * relPos[2]);
-                    double mult = 0.5 / (velo / message.size + 0.1) * (world.rand.nextFloat() * world.rand.nextFloat() + 0.3F) / velo;
-                    for (int d = 0; d < 3; d++) {
-                        relPos[d] *= mult;
-                    }
-                    world.spawnParticle(UMSound.EXPLODE, (fxPosX + message.posX) / 2.0, (fxPosY + message.posY) / 2.0, (fxPosZ + message.posZ) / 2.0, relPos[0], relPos[1], relPos[2]);
-                    world.spawnParticle(UMSound.SMOKE, fxPosX, fxPosY, fxPosZ, relPos[0], relPos[1], relPos[2]);
-                }
-            }
         }
     }
 }

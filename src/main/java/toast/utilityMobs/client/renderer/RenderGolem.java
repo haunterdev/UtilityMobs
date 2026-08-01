@@ -15,7 +15,7 @@ import toast.utilityMobs.golem.EntityUtilityGolem;
 public class RenderGolem extends RenderBiped<EntityUtilityGolem>
 {
     public RenderGolem(RenderManager renderManager) {
-        this(renderManager, new ModelBiped());
+        this(renderManager, new toast.utilityMobs.client.model.ModelGolemBiped());
     }
 
     public RenderGolem(RenderManager renderManager, ModelBiped model) {

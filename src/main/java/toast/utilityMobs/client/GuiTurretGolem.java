@@ -65,7 +65,9 @@ public class GuiTurretGolem extends GuiContainer {
         this.buttonList.add(this.targetModeButton);
         // Help button - compact square tucked in the top-right corner; opens the guide's Turret Upgrades page.
         // Gated by general.show_help_button, matching the block-golem/steam-golem GUIs.
-        this.helpButton = toast.utilityMobs.Properties.getBoolean(toast.utilityMobs.Properties.GENERAL, "show_help_button");
+        // Also hidden without Patchouli: it is a soft dependency and there is no book to open (#1.6).
+        this.helpButton = toast.utilityMobs.PatchouliCompat.isLoaded()
+                && toast.utilityMobs.Properties.getBoolean(toast.utilityMobs.Properties.GENERAL, "show_help_button");
         if (this.helpButton) {
             this.buttonList.add(new BorderedButton(4, this.guiLeft + this.xSize - 22, this.guiTop + 6, 14, 14, "?"));
         }

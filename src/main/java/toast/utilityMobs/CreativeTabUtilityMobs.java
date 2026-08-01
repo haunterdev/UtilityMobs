@@ -65,8 +65,8 @@ public final class CreativeTabUtilityMobs {
                 for (RegistryObject<?> egg : EGGS) {
                     output.accept(new ItemStack((net.minecraft.world.item.Item)egg.get()));
                 }
-                // The Patchouli guide book. Empty when Patchouli is not installed (the API stub hands
-                // back an empty stack), in which case the tab simply has no book entry.
+                // The Patchouli guide book. PatchouliCompat hands back an empty stack when Patchouli is not
+                // installed, in which case the tab simply has no book entry.
                 ItemStack guide = GuideBook.stack();
                 if (!guide.isEmpty()) {
                     output.accept(guide);

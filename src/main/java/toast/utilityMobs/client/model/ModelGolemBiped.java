@@ -9,6 +9,9 @@ import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.BowItem;
+import net.minecraft.world.item.ItemStack;
 import toast.utilityMobs.golem.EntityUtilityGolem;
 
 /**
@@ -42,6 +45,15 @@ public final class ModelGolemBiped {
         return new ZombieArmed(root);
     }
 
+    /** Sets the bow-aiming arm pose from the golem's held item and draw state. */
+    static void applyBowPose(HumanoidModel<EntityUtilityGolem> model, EntityUtilityGolem golem) {
+        ItemStack held = golem.getItemInHand(InteractionHand.MAIN_HAND);
+        model.rightArmPose = held.getItem() instanceof BowItem && golem.isUsingItem()
+            ? HumanoidModel.ArmPose.BOW_AND_ARROW
+            : HumanoidModel.ArmPose.EMPTY;
+        model.leftArmPose = HumanoidModel.ArmPose.EMPTY;
+    }
+
     /**
      * The arms-out pose. 1.12.2 passed a real {@code ModelZombie}, whose setRotationAngles ended with
      * the zombie arm block: {@code flag = entityIn instanceof EntityZombie && isArmsRaised()}, always
@@ -52,6 +64,14 @@ public final class ModelGolemBiped {
     public static class ZombieArmed extends HumanoidModel<EntityUtilityGolem> {
         public ZombieArmed(ModelPart root) {
             super(root);
+        }
+
+        /// Nothing set rightArmPose on this model, so a bow was held like any other item and the 1.9+
+        /// aiming animation never played (1.12.2 issue #17). Shared with ModelGolemPlayer.
+        @Override
+        public void prepareMobModel(EntityUtilityGolem golem, float limbSwing, float limbSwingAmount, float partialTick) {
+            ModelGolemBiped.applyBowPose(this, golem);
+            super.prepareMobModel(golem, limbSwing, limbSwingAmount, partialTick);
         }
 
         @Override

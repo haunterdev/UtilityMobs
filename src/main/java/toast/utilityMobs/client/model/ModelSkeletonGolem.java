@@ -8,7 +8,10 @@ import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
+import com.mojang.blaze3d.vertex.PoseStack;
+
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.ItemStack;
 import toast.utilityMobs.golem.EntityUtilityGolem;
@@ -64,12 +67,28 @@ public class ModelSkeletonGolem extends HumanoidModel<EntityUtilityGolem>
     }
 
     /// 1.20.1's prepareMobModel is the direct replacement for 1.12.2's setLivingAnimations.
+    ///
+    /// The aim is gated on the golem actually drawing the bow, exactly like a vanilla skeleton: it holds
+    /// the pose while its ranged goal keeps the item in use and drops back to idle during the cooldown.
+    /// isUsingItem() is already synced, so no extra EntityDataAccessor is needed (1.12.2 issue #17).
     @Override
     public void prepareMobModel(EntityUtilityGolem golem, float limbSwing, float limbSwingAmount, float partialTick) {
         ItemStack held = golem.getItemInHand(InteractionHand.MAIN_HAND);
-        this.rightArmPose = held.getItem() instanceof BowItem
+        this.rightArmPose = held.getItem() instanceof BowItem && golem.isUsingItem()
             ? HumanoidModel.ArmPose.BOW_AND_ARROW
             : HumanoidModel.ArmPose.EMPTY;
         super.prepareMobModel(golem, limbSwing, limbSwingAmount, partialTick);
+    }
+
+    /// Puts held items in the middle of the arm, matching vanilla SkeletonModel. These arms are 2px wide
+    /// against the 4px arms HumanoidModel.translateToHand assumes, so without the 1px nudge the item hangs
+    /// off the side of the scarecrow's hand (1.12.2 issue #12).
+    @Override
+    public void translateToHand(HumanoidArm arm, PoseStack poseStack) {
+        float offset = arm == HumanoidArm.RIGHT ? 1.0F : -1.0F;
+        ModelPart part = this.getArm(arm);
+        part.x += offset;
+        part.translateAndRotate(poseStack);
+        part.x -= offset;
     }
 }

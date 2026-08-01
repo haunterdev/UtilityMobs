@@ -8,16 +8,14 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-import vazkii.patchouli.api.PatchouliAPI;
-
 /**
  * Glue for the Patchouli guide book ("utilitymobs:guide"). Provides the book stack, a server-side
  * open helper, and the config-gated give-on-first-join handler.
  *
- * <p>Patchouli is an optional dependency (mods.toml marks it {@code mandatory=false}), and its API
- * jar is built for exactly that: {@link PatchouliAPI#get()} hands back a no-op stub when the mod is
- * absent, so every call here is safe without a mod-loaded guard. The stub returns an empty stack,
- * which the give-on-join handler already skips.
+ * <p>Patchouli is an optional dependency (mods.toml marks it {@code mandatory=false}), so nothing here may
+ * name one of its types: without the mod its API classes are absent from the classpath entirely. Every call
+ * goes through {@link PatchouliCompat}, which keeps its own guard and returns an empty stack when Patchouli
+ * is missing. The give-on-join handler already skips an empty stack.
  */
 public final class GuideBook
 {
@@ -31,22 +29,21 @@ public final class GuideBook
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(this);
     }
 
-    // A fresh guide-book stack (Patchouli guide_book item carrying this book's id).
+    // A fresh guide-book stack (Patchouli guide_book item carrying this book's id), empty without Patchouli.
     public static ItemStack stack() {
-        return PatchouliAPI.get().getBookStack(GuideBook.BOOK_RL);
+        return PatchouliCompat.bookStack(GuideBook.BOOK_RL);
     }
 
     // Server-side: open the guide book GUI for a player.
     public static void open(Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
-            PatchouliAPI.get().openBookGUI(serverPlayer, GuideBook.BOOK_RL);
+            PatchouliCompat.openBook(serverPlayer, GuideBook.BOOK_RL);
         }
     }
 
-    /// Client-side: open the guide book from a screen. Only the API is touched, so this stays callable
-    /// even when Patchouli is missing - it just does nothing.
+    /// Client-side: open the guide book from a screen. No-op when Patchouli is missing.
     public static void openClient() {
-        PatchouliAPI.get().openBookGUI(GuideBook.BOOK_RL);
+        PatchouliCompat.openBookClient(GuideBook.BOOK_RL);
     }
 
     /**
@@ -55,8 +52,7 @@ public final class GuideBook
      * is no book to open, so the button is hidden either way rather than being a dead control.
      */
     public static boolean showHelpButton() {
-        return Properties.getBoolean(Properties.GENERAL, "show_help_button")
-            && net.minecraftforge.fml.ModList.get().isLoaded("patchouli");
+        return Properties.getBoolean(Properties.GENERAL, "show_help_button") && PatchouliCompat.isLoaded();
     }
 
     @SubscribeEvent

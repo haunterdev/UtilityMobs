@@ -87,6 +87,8 @@ public abstract class Properties
         add(b, GENERAL, "heal_numbers", true, "If true, a floating green +N appears over a golem when it is healed (melon golem, food, repair item). Set false to hide the numbers - useful with damage-indicator mods.");
         add(b, GENERAL, "show_help_button", true, "If true, golem GUIs (steam golem, block-golem inventories) show a '?' button that opens the guide book. Set false to hide it. Has no effect when Patchouli is not installed (the button is hidden either way).");
         add(b, GENERAL, "creeper_head_rarity", 80, 0, Integer.MAX_VALUE, "The rarity for a creeper to drop its head when killed. Setting this to 0 disables skull drops. Drop chance is 1/(rarity - looting).");
+        add(b, GENERAL, "public_use", false, "If true, ANY player may use and open any golem (GUIs, sitting, equipping), not just its owner and the players its owner granted permission to. The permission books still work; this simply stops them being required.");
+        add(b, GENERAL, "passive_to_players", false, "If true, no golem ever targets a player, whoever owns it. Use with public_use for plain vanilla-style golems that ignore the permission system. Overridden by 'hostile'.");
         add(b, GENERAL, "hostile", false, "If this is true, all utility mobs added by this mod will be hostile towards players.");
         add(b, GENERAL, "wither_conversion", true, "Setting this to false disables the wither skull to skeleton skull recipe.");
         add(b, GENERAL, "skull_rarity", 60, 0, Integer.MAX_VALUE, "The rarity for a skeleton to drop its skull when killed. Setting this to 0 disables skull drops. Drop chance is 1/(rarity - looting).");
@@ -189,6 +191,8 @@ public abstract class Properties
     @SuppressWarnings("unchecked")
     public static void reload() {
         TargetHelper.HOSTILE = getBoolean(GENERAL, "hostile");
+        TargetHelper.publicUse = getBoolean(GENERAL, "public_use");
+        TargetHelper.passiveToPlayers = getBoolean(GENERAL, "passive_to_players");
         TargetHelper.loadGlobalBlacklist(((List<String>)getProperty(GENERAL, "attack_blacklist")).toArray(new String[0]));
         TargetHelper.loadGlobalWhitelist(((List<String>)getProperty(GENERAL, "attack_whitelist")).toArray(new String[0]));
 

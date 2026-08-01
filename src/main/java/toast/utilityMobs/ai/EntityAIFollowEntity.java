@@ -22,6 +22,8 @@ public class EntityAIFollowEntity extends Goal
     /// Optional preference. Candidates matching it win over ones that do not, and the nearest match
     /// wins among equals. Null means "first candidate in the list", which is what 1.12.2 did.
     private java.util.function.Predicate<LivingEntity> preferred;
+    /// Ticks since this follow started, used to re-pick a preferred target periodically.
+    private int recheckTimer;
 
     public EntityAIFollowEntity(Mob entity, Class<? extends LivingEntity> target, double speed, float min, float max) {
         this.isFollowing = false;
@@ -47,6 +49,17 @@ public class EntityAIFollowEntity extends Goal
         this.preferred = preferred;
     }
 
+    /// Whether a candidate is worth following at all, independent of the preference.
+    private boolean isValidCandidate(LivingEntity candidate) {
+        // getEntitiesOfClass does NOT exclude the searcher, so a golem could pick ITSELF, land at
+        // distance 0 (inside rangeMin) and conclude there was nobody to follow. That is why melon golems
+        // sometimes ignored every golem around them and just wandered (1.12.2 issue #14).
+        if (candidate == this.golem || !candidate.isAlive())
+            return false;
+        // Don't trail creative/spectator players (abilities.invulnerable covers both).
+        return !(candidate instanceof Player player && player.getAbilities().invulnerable);
+    }
+
     @Override
     public boolean canUse() {
         if (this.followClass == null || this.golem.getTarget() != null)
@@ -58,8 +71,7 @@ public class EntityAIFollowEntity extends Goal
         boolean havePreferred = false;
         double bestDistance = Double.MAX_VALUE;
         for (LivingEntity candidate : l) {
-            // Don't trail creative/spectator players (abilities.invulnerable covers both).
-            if (candidate instanceof Player player && player.getAbilities().invulnerable)
+            if (!this.isValidCandidate(candidate))
                 continue;
             if (this.preferred == null) {
                 this.followEntity = candidate;
@@ -85,18 +97,28 @@ public class EntityAIFollowEntity extends Goal
 
     @Override
     public boolean canContinueToUse() {
+        // A dead target used to keep the task alive until the navigator ran out of path, so a melon golem
+        // escorting a golem that died just walked to where it had been and then wandered off instead of
+        // picking one of the survivors (1.12.2 issue #14).
+        if (this.followEntity == null || !this.isValidCandidate(this.followEntity))
+            return false;
+        // A healer re-evaluates every few seconds so it moves on to whoever needs it now.
+        if (this.preferred != null && ++this.recheckTimer > 60)
+            return false;
         return !(this.golem.getNavigation().isDone() || this.golem.getTarget() != null);
     }
 
     @Override
     public void start() {
         this.isFollowing = false;
+        this.recheckTimer = 0;
         this.golem.getNavigation().stop();
     }
 
     @Override
     public void stop() {
         this.followEntity = null;
+        this.recheckTimer = 0;
         this.golem.getNavigation().stop();
     }
 

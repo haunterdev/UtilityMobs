@@ -5,6 +5,8 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -231,8 +233,10 @@ public class EntityColossalGolem extends EntityUtilityGolem
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         // Only the owner may mount a colossus, and only in mid-air - jump, then right-click. The
         // air-only rule is what keeps mounting from stealing the ground-level heal/shear interactions.
+        // general.public_use opens golems up to everyone (1.12.2 issue #16).
         if (this.canInteract(player) && !player.isShiftKeyDown()
-                && this.getOwnerName().equals(player.getScoreboardName())) {
+                && (toast.utilityMobs.TargetHelper.publicUse
+                    || this.getOwnerName().equals(player.getScoreboardName()))) {
             if (!player.onGround()) {
                 if (!this.isVehicle()) {
                     player.startRiding(this);
@@ -311,6 +315,48 @@ public class EntityColossalGolem extends EntityUtilityGolem
     @Override
     public double getPassengersRidingOffset() {
         return this.getBbHeight();
+    }
+
+    /**
+     * Puts a dismounting rider on solid ground beside the colossus.
+     *
+     * <p>Entity's default returns {@code (getX(), getBoundingBox().maxY, getZ())}: the top of the
+     * colossus's head, dead centre. For a 3.2-block-tall mob that leaves the rider standing on the golem,
+     * which then walks off under them, and on a multiplayer server they cannot move at all. That is
+     * 1.12.2 issue #18, and it is the same default here.
+     *
+     * <p>Sweeps a ring starting behind the colossus so the rider steps off its back, and refuses any spot
+     * that is not clear or has nothing to stand on. If it is boxed in on every side the vanilla answer is
+     * kept rather than teleporting someone into a wall.
+     */
+    @Override
+    public Vec3 getDismountLocationForPassenger(LivingEntity rider) {
+        double baseY = this.getBoundingBox().minY;
+        double ring = this.getBbWidth() / 2.0 + rider.getBbWidth() / 2.0 + 0.35;
+        for (int step = 0; step < 8; step++) {
+            double angle = Math.toRadians(this.yBodyRot + 180.0F + step * 45.0);
+            double x = this.getX() - Math.sin(angle) * ring;
+            double z = this.getZ() + Math.cos(angle) * ring;
+            for (int dy = 1; dy >= -4; dy--) {
+                double y = baseY + dy;
+                if (this.isSafeDismountSpot(rider, x, y, z)) {
+                    return new Vec3(x, y, z);
+                }
+            }
+        }
+        return super.getDismountLocationForPassenger(rider);
+    }
+
+    private boolean isSafeDismountSpot(LivingEntity rider, double x, double y, double z) {
+        AABB box = rider.getDimensions(rider.getPose()).makeBoundingBox(x, y, z);
+        if (!this.level().noCollision(rider, box))
+            return false;
+        // Never land inside our own collision box - that is the "stuck, can't move" half of the bug.
+        if (box.intersects(this.getBoundingBox()))
+            return false;
+        BlockPos below = BlockPos.containing(x, y - 0.2, z);
+        BlockState state = this.level().getBlockState(below);
+        return state.isFaceSturdy(this.level(), below, Direction.UP) || state.getFluidState().is(FluidTags.WATER);
     }
 
     @Override

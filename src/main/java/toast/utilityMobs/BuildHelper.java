@@ -70,8 +70,9 @@ import toast.utilityMobs.turret.EntityVolleyTurret;
  *
  * <p>Two 1.12.2 concepts have no 1.20.1 equivalent and are replaced by tags rather than reproduced.
  * The wooden-fence set came from the "fenceWood" ore dictionary, which is now {@link BlockTags#WOODEN_FENCES}.
- * Wool was the single Blocks.WOOL with a colour metadata; it is sixteen blocks now, so scarecrow heads
- * are matched against {@link BlockTags#WOOL}.
+ * Scarecrow heads are hay blocks (1.12.2 issue #13), which is a single block in both versions. They used
+ * to be wool: one Blocks.WOOL with a colour metadata in 1.12.2, sixteen separate blocks here, which is
+ * why that check went through {@link BlockTags#WOOL}.
  *
  * <p>Skulls were likewise one block with a type field. Colossal golems accepted any head, which is any
  * {@link AbstractSkullBlock}, while block golems accepted only the skeleton skull, which is now its own
@@ -232,7 +233,9 @@ public class BuildHelper
             BuildHelper.particleEffect(level, ParticleTypes.ITEM_SNOWBALL, x, y, z);
             return true;
         }
-        else if (Properties.getBoolean("build.golems", "Scarecrow") && top.is(BlockTags.WOOL) && BuildHelper.isFenceWood(bottom)) {
+        // Hay, not wool: a scarecrow is made of straw, and it matches the vanilla pillager-outpost
+        // scarecrow (1.12.2 issue #13). Hay is one block, so no tag is needed here.
+        else if (Properties.getBoolean("build.golems", "Scarecrow") && top.is(Blocks.HAY_BLOCK) && BuildHelper.isFenceWood(bottom)) {
             boolean xAxis = BuildHelper.isFenceWood(armLX) && BuildHelper.isFenceWood(armRX);
             boolean zAxis = BuildHelper.isFenceWood(armLZ) && BuildHelper.isFenceWood(armRZ);
             if (xAxis || zAxis) {

@@ -23,6 +23,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySelector;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.Equipable;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -179,10 +180,25 @@ public abstract class EntityUtilityGolem extends AbstractGolem implements Ownabl
             super.playHurtSound(source);
             return;
         }
-        // Block-typed golem: a hit chips the block. Play the BREAK sound at reduced volume and a slightly
-        // higher pitch so it clearly reads as "block breaking" yet stays distinct from the full-volume
-        // death break.
-        this.playSound(type.getBreakSound(), type.getVolume() * 0.7F, type.getPitch() * 1.2F);
+        // Block-typed golem: a hit chips the block. Play the BREAK sound quieter than the death break, but
+        // at nearly the same pitch. It used to be pitched UP (x1.2) against vanilla's x0.8, which is why
+        // e.g. the bound soul's sand break sounded shrill next to a real sand block (1.12.2 issue #11).
+        this.playSound(type.getBreakSound(), type.getVolume() * 0.7F, type.getPitch() * 0.9F);
+    }
+
+    /// Vanilla plays a block's break sound at (volume + 1) / 2 and pitch * 0.8 (see Block.playerDestroy).
+    /// Death runs through LivingEntity.die, which uses these two, so matching them here is what makes a
+    /// golem's death actually sound like that block breaking (1.12.2 issue #11).
+    @Override
+    protected float getSoundVolume() {
+        SoundType type = this.getGolemSoundType();
+        return type == null ? super.getSoundVolume() : (type.getVolume() + 1.0F) / 2.0F;
+    }
+
+    @Override
+    public float getVoicePitch() {
+        SoundType type = this.getGolemSoundType();
+        return type == null ? super.getVoicePitch() : type.getPitch() * 0.8F;
     }
 
     @Override
@@ -247,8 +263,15 @@ public abstract class EntityUtilityGolem extends AbstractGolem implements Ownabl
         float attackDamage = (float)this.getAttributeValue(Attributes.ATTACK_DAMAGE);
         if (this.isWeaponDamageOnly() && !weapon.isEmpty()) {
             // Weapon golems deal only the equipped weapon's own damage, not their innate base on top of it.
-            attackDamage -= (float)this.getAttribute(Attributes.ATTACK_DAMAGE).getBaseValue();
-            attackDamage = Math.max(0.0F, attackDamage);
+            // Only items that carry an ATTACK_DAMAGE modifier raise the attribute above its base
+            // (LivingEntity.detectEquipmentUpdates applies a held stack's modifiers to mobs too), so a golem
+            // holding something that is not a melee weapon - fishing rod, bow, torch - used to come out of
+            // this at exactly 0.0 and swing for literally nothing. Let the weapon REPLACE the innate damage
+            // only when it actually supplies some; otherwise the golem keeps its own.
+            float weaponDamage = attackDamage - (float)this.getAttribute(Attributes.ATTACK_DAMAGE).getBaseValue();
+            if (weaponDamage > 0.0F) {
+                attackDamage = weaponDamage;
+            }
         }
         int knockback = 0;
         if (entity instanceof LivingEntity living) {
@@ -432,12 +455,33 @@ public abstract class EntityUtilityGolem extends AbstractGolem implements Ownabl
         if (itemStack == null) {
             itemStack = ItemStack.EMPTY;
         }
-        if (!this.level().isClientSide && !this.getEquipmentInSlot(slot).isEmpty()) {
-            this.spawnAtLocation(this.getEquipmentInSlot(slot), 0.0F);
+        ItemStack previous = this.getEquipmentInSlot(slot);
+        if (!this.level().isClientSide && !previous.isEmpty()) {
+            this.spawnAtLocation(previous, 0.0F);
         }
         this.setCurrentItemOrArmor(slot, itemStack);
         this.setEquipDropChance(slot, 2.0F);
         return true;
+    }
+
+    /// Hand items get an equip sound too (1.12.2 issue #11). Mob.setItemSlot already routes every
+    /// equipment change through onEquipItem, but LivingEntity's version only makes a sound for an
+    /// Equipable going into its own armour slot, so handing a scarecrow a sword or a bow was silent.
+    /// Armour keeps its own material's sound through super, so modded armour is covered.
+    @Override
+    public void onEquipItem(EquipmentSlot slot, ItemStack from, ItemStack to) {
+        super.onEquipItem(slot, from, to);
+        if (this.level().isClientSide || this.firstTick || this.isSilent())
+            return;
+        if (ItemStack.isSameItemSameTags(from, to))
+            return;
+        ItemStack sounded = to.isEmpty() ? from : to;
+        if (sounded.isEmpty())
+            return;
+        Equipable equipable = Equipable.get(sounded);
+        if (equipable != null && equipable.getEquipmentSlot() == slot)
+            return; // super already played that armour's own equip sound
+        this.playSound(SoundEvents.ARMOR_EQUIP_GENERIC, 1.0F, 1.0F);
     }
 
     /// Inverse of equipSlot for armor: EquipmentSlot -> legacy int slot index.

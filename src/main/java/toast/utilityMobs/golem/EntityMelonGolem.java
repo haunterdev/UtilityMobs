@@ -52,6 +52,12 @@ public class EntityMelonGolem extends EntityStackGolem
         return SoundType.WOOD;
     }
 
+    // No footsteps, matching the vanilla snow golem it is modelled on (1.12.2 issue #11). The melon-wood
+    // step sound was loud and constant for something this small.
+    @Override
+    protected void playStepSound(net.minecraft.core.BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
+    }
+
     public EntityMelonGolem(EntityType<? extends EntityMelonGolem> type, Level level) {
         super(type, level);
         this.texture = EntityMelonGolem.TEXTURE;

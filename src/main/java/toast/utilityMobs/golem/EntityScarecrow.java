@@ -39,7 +39,7 @@ public class EntityScarecrow extends EntityUtilityGolem
 
     @Override
     protected SoundType getGolemSoundType() {
-        return SoundType.WOOL;
+        return SoundType.GRASS;
     }
 
     public EntityScarecrow(EntityType<? extends EntityScarecrow> type, Level level) {
@@ -79,17 +79,13 @@ public class EntityScarecrow extends EntityUtilityGolem
         return data;
     }
 
-    /// 1.12.2 overrode canTriggerWalking() to false so the scarecrow moves silently. That hook has no
-    /// 1.20.1 equivalent (verified against the recompiled Entity class), and its observable effect here
-    /// was suppressing step sounds, so the step sound is silenced directly instead.
-    @Override
-    protected void playStepSound(BlockPos pos, BlockState state) {
-        // Do nothing
-    }
+    // NOTE: playStepSound used to be overridden to do nothing here, mirroring 1.12.2's
+    // canTriggerWalking() = false. That made the scarecrow the one golem with no footsteps at all, which
+    // was reported as a bug (1.12.2 issue #11), so it now plays its hay step sound like the others.
 
     @Override
     protected Item getDropItem() {
-        return Items.WHITE_WOOL;
+        return Items.HAY_BLOCK;
     }
 
     @Override

@@ -15,6 +15,7 @@ import toast.utilityMobs.client.model.ModelBlockGolem;
 import toast.utilityMobs.client.model.ModelChestGolem;
 import toast.utilityMobs.client.model.ModelColossalGolem;
 import toast.utilityMobs.client.model.ModelGolemBiped;
+import toast.utilityMobs.client.model.ModelGolemPlayer;
 import toast.utilityMobs.client.model.ModelLargeGolem;
 import toast.utilityMobs.client.model.ModelSkeletonGolem;
 import toast.utilityMobs.client.model.ModelStackGolem;
@@ -77,6 +78,14 @@ public final class ClientSetup {
         return ctx -> new RenderGolem(ctx, ModelGolemBiped.create(ctx.bakeLayer(GOLEM_LAYER)));
     }
 
+    /// The player-shaped variant, used by the bound soul so resource packs get the second (overlay)
+    /// texture layer (1.12.2 issue #15). Bakes vanilla's own player layer, which is 64x64, so
+    /// boundsoul.png is a skin-layout texture rather than the 64x32 sheet the others use.
+    private static EntityRendererProvider<EntityUtilityGolem> playerBiped() {
+        return ctx -> new RenderGolem(ctx, new ModelGolemPlayer(
+            ctx.bakeLayer(net.minecraft.client.model.geom.ModelLayers.PLAYER)));
+    }
+
     /// The thin-limbed variant of the humanoid renderer, on its own 64x32 layer.
     private static EntityRendererProvider<EntityUtilityGolem> skeletonBiped() {
         return ctx -> new RenderGolem(ctx, new ModelSkeletonGolem(ctx.bakeLayer(SKELETON_GOLEM_LAYER)));
@@ -116,7 +125,7 @@ public final class ClientSetup {
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.STONE_GOLEM.get(), biped());
         event.registerEntityRenderer(ModEntities.ARMOR_GOLEM.get(), biped());
-        event.registerEntityRenderer(ModEntities.BOUND_SOUL.get(), biped());
+        event.registerEntityRenderer(ModEntities.BOUND_SOUL.get(), playerBiped());
         event.registerEntityRenderer(ModEntities.GILDED_GOLEM.get(), biped());
         // The scarecrow is the one golem 1.12.2 gave skeleton limbs to.
         event.registerEntityRenderer(ModEntities.SCARECROW.get(), skeletonBiped());

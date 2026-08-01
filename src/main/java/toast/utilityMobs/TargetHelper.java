@@ -51,6 +51,12 @@ public class TargetHelper
     // If true, mobs attack all players. (Non-final in 1.20.1: the TOML config is not readable at
     // class-init time, so Properties.reload() pushes the value here on every config (re)load.)
     public static boolean HOSTILE = false;
+    // If true, any player may use/open any golem, whatever the owner's permission list says.
+    // Set from general.public_use in Properties.reload(). 1.12.2 issue #16.
+    public static boolean publicUse = false;
+    // If true, no golem ever targets a player, whatever the owner's permission list says.
+    // Set from general.passive_to_players in Properties.reload(). 1.12.2 issue #16.
+    public static boolean passiveToPlayers = false;
 
     /**
      * Lazy Class -> entity registry id cache. 1.12.2 could map both ways through EntityList; 1.20.1's
@@ -237,6 +243,8 @@ public class TargetHelper
     public boolean canDamagePlayer(String username) {
         if (TargetHelper.HOSTILE)
             return true;
+        else if (TargetHelper.passiveToPlayers)
+            return false;
         else if (!this.permissions.containsKey(username))
             return !this.isBlacklisted(Player.class) && this.isWhitelisted(Player.class);
         else
@@ -252,7 +260,9 @@ public class TargetHelper
 
     // Returns true if the player has the given permissions (at least).
     public boolean playerHasPermission(String username, int value) {
-        return this.owner == null || (this.getPermissions(username) & value) == value;
+        // general.public_use drops the ownership gate entirely, for servers that want vanilla-style golems
+        // anyone can walk up to and use rather than the permission-book system (1.12.2 issue #16).
+        return TargetHelper.publicUse || this.owner == null || (this.getPermissions(username) & value) == value;
     }
 
     // Returns true if the given entity should continue to be attacked.

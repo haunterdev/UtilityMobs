@@ -27,8 +27,9 @@ import toast.utilityMobs.golem.EntityUtilityGolem;
  * normal, so the vertex helper is taken from vanilla's FishingHookRenderer rather than emitting bare
  * POSITION_COLOR vertices.
  *
- * <p>{@link EntityGolemFishHook#angler} is a plain server-side field, so it reads null on the client
- * exactly as it did in 1.12.2. The bobber still draws; only the line is skipped.
+ * <p>{@link EntityGolemFishHook#angler} reaches the client through the entity's spawn data, so the line has
+ * something to anchor to. It used to be a plain server-side field, which read null here and skipped the line
+ * entirely (and, worse, made the hook remove itself client-side before it drew a single frame).
  */
 public class RenderGolemFishHook extends EntityRenderer<EntityGolemFishHook>
 {

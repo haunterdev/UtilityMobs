@@ -9,7 +9,7 @@
 A 1.20.1 Forge port of [Utility Mobs: Redux](https://github.com/haunterdev/UtilityMobs/tree/1.12.2),
 which is itself a port and extension of [FatherToast's Utility Mobs](https://www.curseforge.com/minecraft/mc-mods/utility-mobs).
 
-Looking for the 1.12.2 version? Its here -> [`1.12.2` branch](https://github.com/haunterdev/UtilityMobs/tree/1.12.2).
+Looking for the 1.12.2 version? It lives on the [`1.12.2` branch](https://github.com/haunterdev/UtilityMobs/tree/1.12.2).
 
 ## Features
 
@@ -31,12 +31,12 @@ Looking for the 1.12.2 version? Its here -> [`1.12.2` branch](https://github.com
 
 - Minecraft 1.20.1
 - Minecraft Forge 47.0.0 or newer
-- [Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli) (optional)
+- [Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli) (optional, it is what renders the guide book)
 
 ## Installation
 
 1. Install Minecraft Forge for 1.20.1.
-2. Drop `utilitymobs-3.4.0.jar` into your `mods` folder, plus Patchouli if you want the guide book.
+2. Put `utilitymobs-3.4.0-1.20.1.jar` in your `mods` folder, plus Patchouli if you want the guide book.
 3. Launch the game. The guide book is granted automatically on first join (configurable).
 
 ## Building
@@ -45,8 +45,7 @@ Looking for the 1.12.2 version? Its here -> [`1.12.2` branch](https://github.com
 ./gradlew build
 ```
 
-The built jar ends up in `build/libs/`. Patchouli is pulled from the BlameJared maven at compile time,
-so no jar needs to be vendored.
+The built jar lands in `build/libs/`. Patchouli is pulled from the BlameJared maven at compile time.
 
 ## Credits
 

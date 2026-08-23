@@ -1,6 +1,6 @@
 <div align="center">
 
-  <h1>Utility Mobs: Redux (1.12.2 Forge)</h1>
+  <h1>Utility Mobs: Redux (1.12.2)</h1>
 
   <p>Combat golems, block golems, turrets, and colossal golems for Minecraft 1.12.2.</p>
 
@@ -40,7 +40,7 @@ holds the Forge 1.20.1 port.
 ## Installation
 
 1. Install Minecraft Forge for 1.12.2.
-2. Drop Patchouli and `utilitymobs-3.3.0.jar` into your `mods` folder.
+2. Put Patchouli and `utilitymobs-3.4.0.jar` into your `mods` folder.
 3. Launch the game. The guide book is granted automatically on first join (configurable).
 
 ## Building
@@ -49,12 +49,12 @@ holds the Forge 1.20.1 port.
 ./gradlew build
 ```
 
-The built jar lands in `build/libs/`. A deobfuscated Patchouli jar is bundled in `libs/` for compilation; at runtime, install Patchouli as a normal mod.
+The built jar lands in `build/libs/`. Compiling needs a deobfuscated Patchouli 1.12.2 jar in `libs/`. At runtime, install Patchouli as a normal mod.
 
 ## Credits
 
 - Original Utility Mobs mod by **FatherToast** ([CurseForge](https://www.curseforge.com/minecraft/mc-mods/utility-mobs)).
-- 1.12.2 Forge port and Redux additions by **Xy**.
+- 1.12.2 port and Redux additions by **xy**.
 
 ## License
 

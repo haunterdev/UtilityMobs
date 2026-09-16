@@ -28,5 +28,4 @@ libs/
 # Build
 bin/
 
-# Internal working notes (not shipped)
 _docs/

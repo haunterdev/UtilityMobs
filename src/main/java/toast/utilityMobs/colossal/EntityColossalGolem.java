@@ -128,8 +128,30 @@ public class EntityColossalGolem extends EntityUtilityGolem
 
     /// A colossus never reports itself in water, so the float goal and water physics leave it alone and it
     /// walks along the bottom (1.12.2 handleWaterMovement returned false unconditionally).
+    ///
+    /// Overriding updateInWaterStateAndDoFluidPushing alone did not hold that (1.20.1 issue #23, colossi
+    /// floating and rising without end). LivingEntity.checkFallDamage runs the package-private
+    /// updateInWaterStateAndDoWaterCurrentPushing on every move while isInWater() is false, which set
+    /// wasTouchingWater and filled the fluid-height maps the moment a colossus stood in water. The old
+    /// override then skipped the per-tick reset, so that state was never cleared again: travel() kept
+    /// water physics and the fluid jump kept swimming it upward, out of the water and on into the sky
+    /// (GameTest colossusInWaterStaysDown measured 25.8 blocks in 200 ticks). So: isInWater() is pinned
+    /// false, the maps are emptied at the start of every tick before aiStep reads them, and currents do
+    /// not push it. wasTouchingWater is left to checkFallDamage, which only uses it to splash once on entry.
     @Override
     protected boolean updateInWaterStateAndDoFluidPushing() {
+        this.fluidHeight.clear();
+        this.forgeFluidTypeHeight.clear();
+        return false;
+    }
+
+    @Override
+    public boolean isInWater() {
+        return false;
+    }
+
+    @Override
+    public boolean isPushedByFluid() {
         return false;
     }
 
@@ -229,15 +251,24 @@ public class EntityColossalGolem extends EntityUtilityGolem
         UMSound.playAt(this, UMSound.IRONGOLEM_WALK, 1.0F, 1.0F);
     }
 
+    /// The model is drawn at 1.35x (RenderColossalGolem), so its arms and head reach about half a block
+    /// past the 1.8 x 3.2 collision box and clicks on them missed (1.12.2 issue #19). This grows only the
+    /// box the crosshair picks against; movement, collision and arrow hits keep the real size.
+    @Override
+    public float getPickRadius() {
+        return 0.5F;
+    }
+
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
-        // Only the owner may mount a colossus, and only in mid-air - jump, then right-click. The
-        // air-only rule is what keeps mounting from stealing the ground-level heal/shear interactions.
-        // general.public_use opens golems up to everyone (1.12.2 issue #16).
+        // Only the owner may mount a colossus. general.public_use opens golems up to everyone (1.12.2
+        // issue #16). A jump-click mounts with anything in hand; on the ground only an empty main hand
+        // mounts, like a horse (1.12.2 issue #19), so a held item still reaches the heal, shear, lead and
+        // name tag interactions.
         if (this.canInteract(player) && !player.isShiftKeyDown()
                 && (toast.utilityMobs.TargetHelper.publicUse
                     || this.getOwnerName().equals(player.getScoreboardName()))) {
-            if (!player.onGround()) {
+            if (!player.onGround() || player.getMainHandItem().isEmpty()) {
                 if (!this.isVehicle()) {
                     player.startRiding(this);
                 }

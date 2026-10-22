@@ -36,7 +36,7 @@ Looking for the 1.12.2 version? It lives on the [`1.12.2` branch](https://github
 ## Installation
 
 1. Install Minecraft Forge for 1.20.1.
-2. Put `utilitymobs-3.4.0-1.20.1.jar` in your `mods` folder, plus Patchouli if you want the guide book.
+2. Put `utilitymobs-3.4.1-1.20.1.jar` in your `mods` folder, plus Patchouli if you want the guide book.
 3. Launch the game. The guide book is granted automatically on first join (configurable).
 
 ## Building

@@ -224,6 +224,17 @@ public class TargetHelper
         return null;
     }
 
+    // True if the owner check in isValidTarget applies. Tameable modded mobs (and wolves, cats, ...) are
+    // OwnableEntity even when wild; a wild one has no owner UUID, so judging it by "may I hurt its owner"
+    // asked canDamagePlayer(null), and with players off-limits that rejected every wild one before the
+    // attack whitelist was read (1.12.2 issue #20, same code here). Golems keep the check either way: an
+    // ownerless golem was never fair game unless players are.
+    private static boolean hasOwnerToCheck(Entity entity) {
+        if (entity instanceof EntityUtilityGolem)
+            return true;
+        return entity instanceof OwnableEntity ownable && ownable.getOwnerUUID() != null;
+    }
+
     // Attempts to find the player on the server. Returns null if the player cannot be found.
     public Player getOwner() {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
@@ -281,7 +292,7 @@ public class TargetHelper
             return false;
         if (this.owner == null)
             return entity instanceof EntityUtilityGolem golem ? golem.getOwner() != null : true;
-        if (entity instanceof OwnableEntity) {
+        if (TargetHelper.hasOwnerToCheck(entity)) {
             String ownerName = TargetHelper.ownerNameOf(entity);
             if (this.owner.equals(ownerName) || !this.canDamagePlayer(ownerName))
                 return false;

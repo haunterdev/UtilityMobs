@@ -421,9 +421,16 @@ public abstract class EntityUtilityGolem extends AbstractGolem implements Ownabl
         float healed = this.getHealth() - before;
         if (healed > 0.0F && !this.level().isClientSide) {
             toast.utilityMobs.network.MessageHealNumber.send(this, healed);
-            UMSound.playAt(this, UMSound.STEP_STONE, 0.6F, 1.4F + this.random.nextFloat() * 0.2F);
+            this.playHealSound();
         }
         return healed;
+    }
+
+    /// Vanilla's iron golem repair sound, at the volume and pitch spread IronGolem.mobInteract plays it
+    /// with (1.12.2 issue #21). Differs from 1.12.2, which played a high stone step: that version has no
+    /// repair sound to use.
+    protected void playHealSound() {
+        UMSound.playAt(this, SoundEvents.IRON_GOLEM_REPAIR, 1.0F, 1.0F + (this.random.nextFloat() - this.random.nextFloat()) * 0.2F);
     }
 
     public boolean canInteract(Player player) {
@@ -643,13 +650,26 @@ public abstract class EntityUtilityGolem extends AbstractGolem implements Ownabl
         return this.sinks < 0 && super.isPushedByFluid();
     }
 
+    /// Sinking golems never report themselves in water (see updateInWaterStateAndDoFluidPushing).
+    @Override
+    public boolean isInWater() {
+        return this.sinks < 0 && super.isInWater();
+    }
+
     /// 1.12.2 handleWaterMovement port: a golem with sinks >= 0 never reports "in water" (so the
     /// float goal and water physics leave it alone and it walks along the bottom), but still plays
     /// the surface splash once on entry and stays fire-extinguished/fall-safe while submerged.
+    ///
+    /// The fluid-height maps are emptied every tick and isInWater() is pinned false for the same reason as
+    /// EntityColossalGolem's: LivingEntity.checkFallDamage refills that state through a package-private
+    /// call this cannot override, and without a per-tick reset it stuck "in water" for good and swam the
+    /// entity upward out of the water (1.20.1 issue #23).
     @Override
     protected boolean updateInWaterStateAndDoFluidPushing() {
         if (this.sinks < 0)
             return super.updateInWaterStateAndDoFluidPushing();
+        this.fluidHeight.clear();
+        this.forgeFluidTypeHeight.clear();
         if (this.level().containsAnyLiquid(this.getBoundingBox().expandTowards(0.0, -0.4, 0.0).deflate(0.001))) {
             if (this.sinks < 1) {
                 this.doWaterSplashEffect();

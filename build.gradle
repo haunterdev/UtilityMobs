@@ -30,6 +30,10 @@ minecraft {
         }
         client {}
         server { args '--nogui' }
+        // Headless GameTests (src/main/java/toast/utilityMobs/gametest). Exits when the suite finishes.
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
     }
 }
 

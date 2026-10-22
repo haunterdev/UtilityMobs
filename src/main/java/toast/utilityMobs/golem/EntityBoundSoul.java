@@ -1,6 +1,7 @@
 package toast.utilityMobs.golem;
 
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntityType;
@@ -16,6 +17,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.SoundType;
 import toast.utilityMobs.TargetHelper;
+import toast.utilityMobs.UMSound;
 import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.ai.EntityAIFollowEntity;
 import toast.utilityMobs.ai.EntityAIGolemTarget;
@@ -66,6 +68,12 @@ public class EntityBoundSoul extends EntityUtilityGolem
         }
     }
 
+    /// A soul heals by eating, so it gets vanilla's eating sound rather than the golem repair clank.
+    @Override
+    protected void playHealSound() {
+        UMSound.playAt(this, SoundEvents.GENERIC_EAT, 1.0F, 1.0F + (this.random.nextFloat() - this.random.nextFloat()) * 0.2F);
+    }
+
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!this.canInteract(player))
@@ -82,6 +90,9 @@ public class EntityBoundSoul extends EntityUtilityGolem
             return super.mobInteract(player, hand);
         FoodProperties food = playerHeld.getFoodProperties(this);
         if (food != null) {
+            // A soul at full health does not eat; the food stays in the player's hand (1.12.2 issue #21).
+            if (this.getHealth() >= this.getMaxHealth())
+                return super.mobInteract(player, hand);
             this.healAndShowNumber(food.getNutrition());
         }
         else if (!this.level().isClientSide) {

@@ -7,6 +7,7 @@ import net.minecraft.entity.ai.EntityAIWander;
 import net.minecraft.entity.ai.EntityAIWatchClosest;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
+import net.minecraft.init.SoundEvents;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemFood;
 import net.minecraft.item.ItemStack;
@@ -14,6 +15,7 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.world.World;
 import toast.utilityMobs.TargetHelper;
+import toast.utilityMobs.UMSound;
 import toast.utilityMobs._UtilityMobs;
 import toast.utilityMobs.ai.EntityAIFollowEntity;
 import toast.utilityMobs.ai.EntityAIGolemTarget;
@@ -59,6 +61,12 @@ public class EntityBoundSoul extends EntityUtilityGolem
         }
     }
 
+    // A soul heals by eating, so it gets vanilla's eating sound rather than the golem stone step.
+    @Override
+    protected void playHealSound() {
+        UMSound.playAt(this, SoundEvents.ENTITY_GENERIC_EAT, 1.0F, 1.0F + (this.rand.nextFloat() - this.rand.nextFloat()) * 0.2F);
+    }
+
     @Override
     public boolean processInteract(EntityPlayer player, EnumHand hand) {
         if (!this.canInteract(player))
@@ -74,6 +82,9 @@ public class EntityBoundSoul extends EntityUtilityGolem
         if (player.isSneaking())
             return super.processInteract(player, hand);
         if (playerHeld.getItem() instanceof ItemFood) {
+            // A soul at full health does not eat; the food stays in the player's hand (issue #21).
+            if (this.getHealth() >= this.getMaxHealth())
+                return super.processInteract(player, hand);
             this.healAndShowNumber(((ItemFood)playerHeld.getItem()).getHealAmount(playerHeld));
         }
         else if (!this.world.isRemote) {

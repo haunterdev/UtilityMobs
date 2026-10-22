@@ -215,6 +215,17 @@ public class TargetHelper
         return null;
     }
 
+    // True if the owner check in isValidTarget applies. Lycanites creatures (and wolves, ocelots, ...) are
+    // IEntityOwnable even when wild; a wild one has no owner id, so judging it by "may I hurt its owner"
+    // asked canDamagePlayer(null), and with players off-limits that rejected every wild Lycanites mob
+    // before the attack whitelist was read (issue #20). Golems keep the check either way: an ownerless
+    // golem was never fair game unless players are.
+    private static boolean hasOwnerToCheck(Entity entity) {
+        if (entity instanceof EntityUtilityGolem)
+            return true;
+        return entity instanceof IEntityOwnable && ((IEntityOwnable)entity).getOwnerId() != null;
+    }
+
     // Attempts to find the player on the server. Returns null if the player cannot be found.
     public EntityPlayer getOwner() {
         EntityPlayer player;
@@ -277,7 +288,7 @@ public class TargetHelper
             return false;
         if (this.owner == null)
             return entity instanceof EntityUtilityGolem ? ((IEntityOwnable)entity).getOwner() != null : true;
-        if (entity instanceof IEntityOwnable) {
+        if (TargetHelper.hasOwnerToCheck(entity)) {
             String ownerName = TargetHelper.ownerNameOf(entity);
             if (this.owner.equals(ownerName) || !this.canDamagePlayer(ownerName))
                 return false;

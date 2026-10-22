@@ -22,11 +22,22 @@ minecraft {
     )
 }
 
+repositories {
+    mavenCentral()
+}
+
 dependencies {
     // Patchouli guide-book library (1.0-23.6). Compile-only: the runtime copy is
     // provided by the instance's mods folder. rfg.deobf remaps the published jar to
     // MCP dev names so the API (vazkii.patchouli.api.*) resolves in dev.
     implementation rfg.deobf(files('libs/Patchouli-1.0-23.6.jar'))
+
+    // JUnit for the Forge-free WizardConfig.resolve unit test.
+    testImplementation 'junit:junit:4.13.2'
+}
+
+test {
+    useJUnit()
 }
 
 processResources {

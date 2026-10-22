@@ -48,7 +48,7 @@ public class _UtilityMobs
     // This mod's id (lowercased for 1.12.2 - registry/resource domains must be lowercase).
     public static final String MODID = "utilitymobs";
     // This mod's version.
-    public static final String VERSION = "3.4.0";
+    public static final String VERSION = "3.4.1";
 
     // If true, this mod starts up in debug mode.
     public static final boolean debug = false;

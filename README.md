@@ -40,7 +40,7 @@ holds the Forge 1.20.1 port.
 ## Installation
 
 1. Install Minecraft Forge for 1.12.2.
-2. Put Patchouli and `utilitymobs-3.4.0.jar` into your `mods` folder.
+2. Put Patchouli and `utilitymobs-3.4.1.jar` into your `mods` folder.
 3. Launch the game. The guide book is granted automatically on first join (configurable).
 
 ## Building

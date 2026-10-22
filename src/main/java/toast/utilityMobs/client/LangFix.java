@@ -18,10 +18,11 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 import toast.utilityMobs._UtilityMobs;
 
 /**
-    The mod's en_us.lang is present in the jar but Minecraft's resource pack layer does not serve it
-    for this mod (textures from the same domain load fine, the lang file throws FileNotFound). To make
-    entity/egg/creative-tab names show, load the lang straight off the classpath and inject it into the
-    active Locale, re-applying on every resource reload (vanilla rebuilds the Locale on reload).
+    Up to 3.4.0 the jar had no pack.mcmeta, so Forge gave it a dummy pack_format 2 and wrapped it in
+    LegacyV2Adapter, which asks for lang/en_US.lang; the jar's en_us.lang was never found (textures from
+    the same domain loaded fine). The jar now ships pack.mcmeta with pack_format 3 and vanilla loads the
+    lang itself. This stays as a fallback: it loads the lang straight off the classpath and fills any key
+    the active Locale is missing, re-applying on every resource reload (vanilla rebuilds the Locale then).
  */
 @SideOnly(Side.CLIENT)
 public class LangFix implements IResourceManagerReloadListener

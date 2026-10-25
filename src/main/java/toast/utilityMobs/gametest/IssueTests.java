@@ -44,7 +44,7 @@ import toast.utilityMobs.setup.ModEntities;
  * {@code gradlew runGameTestServer}; inert in a normal game.
  */
 @GameTestHolder(_UtilityMobs.MODID)
-public class IssueSweepTests {
+public class IssueTests {
 
     private static final String MOCK_NAME = "test-mock-player";
 

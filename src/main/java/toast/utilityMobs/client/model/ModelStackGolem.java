@@ -21,7 +21,7 @@ import toast.utilityMobs.golem.EntityUtilityGolem;
  * it the one name reobf can map.
  *
  * <p>The geometry is vanilla's own layer ({@link SnowGolemModel#createBodyLayer()}), and
- * {@link #setupAnim} is vanilla SnowGolemModel.setupAnim line for line, plus the sitting override.
+ * {@link #setupAnim} copies vanilla SnowGolemModel.setupAnim and adds the sitting override.
  */
 public class ModelStackGolem extends HierarchicalModel<EntityUtilityGolem> implements HeadedModel
 {

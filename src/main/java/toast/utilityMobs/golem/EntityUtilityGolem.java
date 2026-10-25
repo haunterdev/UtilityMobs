@@ -399,8 +399,8 @@ public abstract class EntityUtilityGolem extends EntityGolem implements IEntityO
         return healed;
     }
 
-    // Issue #21 asked for the modern iron golem repair sound. 1.12.2 has no such sound (it arrived in 1.15),
-    // so golems keep the stone step here; subclasses that heal some other way override this.
+    // 1.12.2 has no iron golem repair sound (it arrived in 1.15), so golems play the stone step here;
+    // subclasses that heal some other way override this.
     protected void playHealSound() {
         UMSound.playAt(this, UMSound.STEP_STONE, 0.6F, 1.4F + this.rand.nextFloat() * 0.2F);
     }

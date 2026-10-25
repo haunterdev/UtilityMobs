@@ -287,7 +287,7 @@ public class EntityColossalGolem extends EntityUtilityGolem
     }
 
     // The model is drawn at 1.35x (RenderColossalGolem), so its arms and head reach about half a block past
-    // the 1.8 x 3.2 collision box and clicks on them used to miss (issue #19). This grows only the box the
+    // the 1.8 x 3.2 collision box and clicks on them would miss (issue #19). This grows only the box the
     // crosshair picks against; movement and collision keep the real size.
     @Override
     public float getCollisionBorderSize() {
@@ -297,9 +297,9 @@ public class EntityColossalGolem extends EntityUtilityGolem
     @Override
     public boolean processInteract(EntityPlayer player, EnumHand hand) {
         // Only the owner may mount a colossus, unless general.public_use opens golems up to everyone (#16).
-        // Mounting used to need a jump-click. An empty main hand now mounts from the ground too, like a
-        // horse (issue #19); a held item on the ground still falls through to healing, shearing, leads and
-        // name tags, and a jump-click still mounts with anything in hand.
+        // An empty main hand mounts from the ground, like a horse (issue #19); a held item on the ground
+        // falls through to healing, shearing, leads and name tags, and a jump-click mounts with anything
+        // in hand.
         if (this.canInteract(player) && !player.isSneaking()
                 && (toast.utilityMobs.TargetHelper.publicUse || this.getOwnerName().equals(player.getName()))) {
             if (!player.onGround || player.getHeldItemMainhand().isEmpty()) {

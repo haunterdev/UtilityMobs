@@ -225,10 +225,10 @@ public class TargetHelper
     }
 
     // True if the owner check in isValidTarget applies. Tameable modded mobs (and wolves, cats, ...) are
-    // OwnableEntity even when wild; a wild one has no owner UUID, so judging it by "may I hurt its owner"
-    // asked canDamagePlayer(null), and with players off-limits that rejected every wild one before the
-    // attack whitelist was read (1.12.2 issue #20, same code here). Golems keep the check either way: an
-    // ownerless golem was never fair game unless players are.
+    // OwnableEntity even when wild; a wild one has no owner UUID, and judging it by "may I hurt its owner"
+    // would ask canDamagePlayer(null), which rejects every wild one when players are off-limits, before
+    // the attack whitelist is read (1.12.2 issue #20). Golems keep the check either way: an ownerless
+    // golem is never fair game unless players are.
     private static boolean hasOwnerToCheck(Entity entity) {
         if (entity instanceof EntityUtilityGolem)
             return true;

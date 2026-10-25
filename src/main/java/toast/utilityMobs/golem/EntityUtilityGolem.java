@@ -427,8 +427,7 @@ public abstract class EntityUtilityGolem extends AbstractGolem implements Ownabl
     }
 
     /// Vanilla's iron golem repair sound, at the volume and pitch spread IronGolem.mobInteract plays it
-    /// with (1.12.2 issue #21). Differs from 1.12.2, which played a high stone step: that version has no
-    /// repair sound to use.
+    /// with (1.12.2 issue #21). 1.12.2 has no such sound and plays a stone step instead.
     protected void playHealSound() {
         UMSound.playAt(this, SoundEvents.IRON_GOLEM_REPAIR, 1.0F, 1.0F + (this.random.nextFloat() - this.random.nextFloat()) * 0.2F);
     }
@@ -662,8 +661,8 @@ public abstract class EntityUtilityGolem extends AbstractGolem implements Ownabl
     ///
     /// The fluid-height maps are emptied every tick and isInWater() is pinned false for the same reason as
     /// EntityColossalGolem's: LivingEntity.checkFallDamage refills that state through a package-private
-    /// call this cannot override, and without a per-tick reset it stuck "in water" for good and swam the
-    /// entity upward out of the water (1.20.1 issue #23).
+    /// call this cannot override, and without a per-tick reset it would stay "in water" for good and swim
+    /// upward out of the water (1.20.1 issue #23).
     @Override
     protected boolean updateInWaterStateAndDoFluidPushing() {
         if (this.sinks < 0)

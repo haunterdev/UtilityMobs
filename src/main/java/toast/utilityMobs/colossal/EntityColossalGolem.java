@@ -129,15 +129,13 @@ public class EntityColossalGolem extends EntityUtilityGolem
     /// A colossus never reports itself in water, so the float goal and water physics leave it alone and it
     /// walks along the bottom (1.12.2 handleWaterMovement returned false unconditionally).
     ///
-    /// Overriding updateInWaterStateAndDoFluidPushing alone did not hold that (1.20.1 issue #23, colossi
-    /// floating and rising without end). LivingEntity.checkFallDamage runs the package-private
-    /// updateInWaterStateAndDoWaterCurrentPushing on every move while isInWater() is false, which set
-    /// wasTouchingWater and filled the fluid-height maps the moment a colossus stood in water. The old
-    /// override then skipped the per-tick reset, so that state was never cleared again: travel() kept
-    /// water physics and the fluid jump kept swimming it upward, out of the water and on into the sky
-    /// (GameTest colossusInWaterStaysDown measured 25.8 blocks in 200 ticks). So: isInWater() is pinned
-    /// false, the maps are emptied at the start of every tick before aiStep reads them, and currents do
-    /// not push it. wasTouchingWater is left to checkFallDamage, which only uses it to splash once on entry.
+    /// LivingEntity.checkFallDamage runs the package-private updateInWaterStateAndDoWaterCurrentPushing
+    /// on every move while isInWater() is false, which sets wasTouchingWater and fills the fluid-height
+    /// maps as soon as a colossus stands in water. Left alone, that state is never cleared: travel() keeps
+    /// water physics and the fluid jump swims it upward, out of the water and into the sky (1.20.1 issue
+    /// #23). So isInWater() is pinned false, the maps are emptied at the start of every tick before aiStep
+    /// reads them, and currents do not push it. wasTouchingWater is left to checkFallDamage, which only
+    /// uses it to splash once on entry.
     @Override
     protected boolean updateInWaterStateAndDoFluidPushing() {
         this.fluidHeight.clear();
@@ -252,7 +250,7 @@ public class EntityColossalGolem extends EntityUtilityGolem
     }
 
     /// The model is drawn at 1.35x (RenderColossalGolem), so its arms and head reach about half a block
-    /// past the 1.8 x 3.2 collision box and clicks on them missed (1.12.2 issue #19). This grows only the
+    /// past the 1.8 x 3.2 collision box and clicks on them would miss (1.12.2 issue #19). This grows only the
     /// box the crosshair picks against; movement, collision and arrow hits keep the real size.
     @Override
     public float getPickRadius() {
@@ -293,8 +291,8 @@ public class EntityColossalGolem extends EntityUtilityGolem
      * moveStrafing/moveForward off the rider. 1.20.1 splits the same work across three hooks that
      * LivingEntity calls in order - getRiddenInput for the movement vector, tickRidden for everything
      * else per tick, getRiddenSpeed for the speed - and only enters them when the controlling passenger
-     * is a player, which is exactly the branch the old override tested for first. The limb-swing
-     * bookkeeping the old code did by hand is gone because travel() now calls calculateEntityAnimation.
+     * is a player, which is the branch the 1.12.2 override tested for first. The limb-swing
+     * bookkeeping is left to travel(), which calls calculateEntityAnimation.
      *
      * <p>Two gates carry over unchanged. A rider the colossus considers a valid target never gets
      * control, so you cannot ride a colossus that wants to kill you. And with

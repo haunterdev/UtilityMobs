@@ -12,14 +12,13 @@ import toast.utilityMobs.golem.EntityUtilityGolem;
  * The snowman-shaped golem model. 1.12.2 subclassed vanilla ModelSnowMan purely to drop the arm
  * swing while the golem is sitting.
  *
- * <p>This does NOT extend 1.20.1's SnowGolemModel, on purpose. CustomHeadLayer (which draws the block
- * in the golem's HEAD slot, as 1.12.2's LayerCustomHead did) needs a {@link HeadedModel}, and
- * SnowGolemModel's getHead() is its own method rather than an implementation of that interface. In a
- * dev run both are named getHead, so inheriting it compiled and worked; after reobf the interface
- * method is m_5585_ and SnowGolemModel's is a different SRG name, so the released jar threw
- * AbstractMethodError the first time a pumpkin-headed melon or snow golem was drawn, in the world or
- * in the guide book (1.20.1 issue #23). Declaring getHead() here, on a class whose only getHead is
- * the interface's, gives it the one name reobf can map.
+ * <p>This does not extend SnowGolemModel. CustomHeadLayer (which draws the block in the golem's HEAD
+ * slot, as 1.12.2's LayerCustomHead did) needs a {@link HeadedModel}, and SnowGolemModel's getHead() is
+ * its own method rather than an implementation of that interface. Both are named getHead in a dev run,
+ * but after reobf the interface method is m_5585_ and SnowGolemModel's has a different SRG name, so an
+ * inherited getHead throws AbstractMethodError when a pumpkin-headed melon or snow golem is drawn
+ * (1.20.1 issue #23). Declaring getHead() here, on a class whose only getHead is the interface's, gives
+ * it the one name reobf can map.
  *
  * <p>The geometry is vanilla's own layer ({@link SnowGolemModel#createBodyLayer()}), and
  * {@link #setupAnim} is vanilla SnowGolemModel.setupAnim line for line, plus the sitting override.

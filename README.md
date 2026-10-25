@@ -35,7 +35,11 @@ holds the Forge 1.20.1 port.
 
 - Minecraft 1.12.2
 - Minecraft Forge 14.23.5.2860 or newer
-- [Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli)
+- [Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli), optional, for the guide book
+
+## Known issues
+
+- Small golems often fail to hit very wide mobs, such as large Lycanites creatures: they walk into them without landing a hit. Colossi reach them more often.
 
 ## Installation
 

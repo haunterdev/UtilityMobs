@@ -1,12 +1,12 @@
 <div align="center">
 
-  <h1>Utility Mobs: Redux (1.20.1 Forge)</h1>
+  <h1>Utility Mobs: Redux (1.20.1)</h1>
 
   <p>Combat golems, block golems, turrets, and colossal golems for Minecraft 1.20.1.</p>
 
 </div>
 
-A 1.20.1 Forge port of [Utility Mobs: Redux](https://github.com/haunterdev/UtilityMobs/tree/1.12.2),
+A 1.20.1 port of [Utility Mobs: Redux](https://github.com/haunterdev/UtilityMobs/tree/1.12.2),
 which is itself a port and extension of [FatherToast's Utility Mobs](https://www.curseforge.com/minecraft/mc-mods/utility-mobs).
 
 Looking for the 1.12.2 version? It lives on the [`1.12.2` branch](https://github.com/haunterdev/UtilityMobs/tree/1.12.2).
@@ -50,7 +50,7 @@ The built jar lands in `build/libs/`. Patchouli is pulled from the BlameJared ma
 ## Credits
 
 - Original Utility Mobs mod by **FatherToast** ([CurseForge](https://www.curseforge.com/minecraft/mc-mods/utility-mobs)).
-- Redux additions and the 1.12.2 and 1.20.1 Forge ports by **Xy**.
+- Redux additions and the 1.12.2 and 1.20.1 ports by **xy**.
 
 ## License
 
